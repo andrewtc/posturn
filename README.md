@@ -4,6 +4,8 @@ SPDX-FileCopyrightText: 2024 Andrew T. Christensen <andrew@andrewtc.com>
 SPDX-License-Identifier: CC-BY-SA-4.0
 -->
 
+[![Build Status](https://github.com/andrewtc/posturn/actions/workflows/rust.yml/badge.svg?branch=main)](https://github.com/andrewtc/posturn/actions/workflows/rust.yml?branch=main)
+
 # 🛞 posturn 🎮
 Build turn-based games with `async` Rust
 
