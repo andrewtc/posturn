@@ -4,6 +4,7 @@
 
 [package]
 name = "posturn"
+authors = ["Andrew T. Christensen <andrew@andrewtc.com>"]
 version = "0.1.0"
 edition = "2021"
 
