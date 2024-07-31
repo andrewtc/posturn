@@ -1,0 +1,14 @@
+# SPDX-FileCopyrightText: 2024 Andrew T. Christensen <andrew@andrewtc.com>
+#
+# SPDX-License-Identifier: MIT
+
+[package]
+name = "posturn"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+genawaiter = "^0.99"
+
+[dev-dependencies]
+futures = "^0.3"
