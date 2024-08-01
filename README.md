@@ -18,7 +18,7 @@ machine with transitions, why not write a [`Coroutine`](https://doc.rust-lang.or
 To use `posturn`, simply add this to your `Cargo.toml`:
 
 ```toml
-[features]
+[dependencies]
 posturn = "0.1.0"
 ```
 
