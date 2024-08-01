@@ -35,3 +35,12 @@ in the direction of using the `std` implementation, gated by a `feature` flag.
 
 For `0.1.0`, the dependency on `genawaiter` is required. If you need `std` support for a `nightly` project, please see
 [this](https://github.com/andrewtc/posturn/issues/1) issue or open a PR on GitHub.
+
+## ⚖️ License
+All Rust code is licensed under the [MIT](/LICENSES/MIT.txt) license.
+
+Various other files (e.g. this `README`) are licensed under one of the following:
+ - [Creative Commons Attribution-ShareAlike 4.0 International](/LICENSES/CC-BY-SA-4.0.txt)
+ - [CC0 1.0 Universal](/LICENSES/CC0-1.0.txt)
+
+`posturn` aims to be [REUSE compliant](https://reuse.software/). The `SPDX-License-Identifier` at the top of each file shows which license is associated with it.
