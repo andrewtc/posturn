@@ -7,13 +7,13 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 [![Build Status](https://github.com/andrewtc/posturn/actions/workflows/rust.yml/badge.svg?branch=main)](https://github.com/andrewtc/posturn/actions/workflows/rust.yml?branch=main)
 [![REUSE status](https://api.reuse.software/badge/github.com/andrewtc/posturn)](https://api.reuse.software/info/github.com/andrewtc/posturn)
 
-# 🛞 posturn 🎮
+# 🏰 posturn 🎮
 Build turn-based games with `async` Rust
 
 This crate offers a simple way to create complex turn-based games. Instead of modeling the game as a monolithic state
 machine with transitions, why not write a [`Coroutine`](https://doc.rust-lang.org/std/ops/trait.Coroutine.html)?
 
-## Usage
+## 📃 Usage
 To use `posturn`, simply add this to your `Cargo.toml`:
 
 ```toml
