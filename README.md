@@ -34,7 +34,7 @@ implementation of Rust coroutines. Once the [`Coroutine`](https://doc.rust-lang.
 has been stabilized ([RFC 2033](https://github.com/rust-lang/rust/issues/43122)), future versions of `posturn` may move
 in the direction of using the `std` implementation, gated by a `feature` flag.
 
-For `0.1.0`, the dependency on `genawaiter` is required. If you need `std` support for a `nightly` project, please see
+For now, the dependency on `genawaiter` is required. If you need `std` support for a `nightly` project, please see
 [this](https://github.com/andrewtc/posturn/issues/1) issue or open a PR on GitHub.
 
 ## ⚖️ License
