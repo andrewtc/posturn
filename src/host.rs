@@ -80,6 +80,14 @@ impl<Game> Host<Game> where
       self.with_game(|game| *game)
    }
 
+   /// Clones the game state out of the [`Host`]. Note that this is **only** available for game states implementing the
+   /// [`Clone`] trait.
+   pub fn clone_game(&self) -> Game where
+      Game : Clone,
+   {
+      self.with_game(|game| game.clone())
+   }
+
    /// Grants temporary read access to the shared game state via a [`FnOnce`] transaction. 
    /// 
    /// # Safety
