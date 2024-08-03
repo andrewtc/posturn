@@ -12,7 +12,18 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 Build turn-based games with `async` Rust
 
 This crate offers a simple way to create complex turn-based games. Instead of modeling the game as a monolithic state
-machine with transitions, why not write a [`Coroutine`](https://doc.rust-lang.org/std/ops/trait.Coroutine.html)?
+machine with transitions, why not write a [`Coroutine`](https://doc.rust-lang.org/std/ops/trait.Coroutine.html)
+instead?
+
+`posturn` allows you to model your turn-based game logic as an `async` function that emits events. When an event is
+emitted, the turn-based game enters into a wait-for-input state using `await`, pausing the game and returning control
+to the UI layer. While paused, the UI can handle the event and re-render itself however it wishes. Once the player is
+ready to continue, the UI resumes the turn-based game, supplying any player input necessary to take the next turn.
+
+This approach has the advantage of keeping all UI logic separate from turn-based game code. Theoretically, a game
+written in this way could be used with _any_ frontend capable of processing the events emitted by the game.
+
+For a simple example, see the simple [`RoShamBo`](/src/tests.rs) game included with this library.
 
 ## 📃 Usage
 To use `posturn`, simply add this to your `Cargo.toml`:
