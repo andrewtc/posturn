@@ -4,7 +4,7 @@
 
 use std::{cmp::Ordering, string::String};
 use genawaiter::{Generator, GeneratorState};
-use crate::{Host, Play};
+use crate::{Context, Host, Play};
 
 /// Represents input received from a player in a game of [`RoShamBo`].
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -61,15 +61,15 @@ impl Play for RoShamBo {
    type Event = Msg;
    type Outcome = Outcome;
 
-   fn play(host : Host<Self>, co : genawaiter::rc::Co<Self::Event, Self::Input>) -> impl std::future::Future<Output = Self::Outcome> {
+   fn play(ctx : Context<Self>) -> impl std::future::Future<Output = Self::Outcome> {
       async move {
          // Count down to the reveal of both choices...
-         co.yield_(Msg("Ro!".into())).await;
-         co.yield_(Msg("Sham!".into())).await;
-         co.yield_(Msg("Bo!".into())).await;
+         ctx.yield_event(Msg("Ro!".into())).await;
+         ctx.yield_event(Msg("Sham!".into())).await;
+         ctx.yield_event(Msg("Bo!".into())).await;
 
          // Assess the winner.
-         let Self(player_1, player_2) = host.game();
+         let Self(player_1, player_2) = ctx.host.game();
          let outcome = match player_1.partial_cmp(&player_2).unwrap() {
             Ordering::Equal => Outcome::Tie,
             Ordering::Greater => Outcome::Win,
@@ -84,11 +84,16 @@ impl Play for RoShamBo {
                Outcome::Loss => format!("{player_2:?} beats {player_1:?}."),
             };
 
-         co.yield_(Msg(msg)).await;
+         ctx.yield_event(Msg(msg)).await;
 
          // Game over!
          outcome
       }
+   }
+
+   fn handle_event(&mut self, event : &<Self as Play>::Event) {
+      // For easier debugging of tests, print messages to the console. Use `cargo test -- --nocapture` to display these.
+      println!("{}", event.0)
    }
 }
 
