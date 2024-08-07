@@ -48,8 +48,8 @@ pub trait Play : Sized {
    /// Player input which **must** be supplied whenever the game is resumed on a player's turn.
    type Input : Sized;
 
-   /// The type representing the final outcome of the game. This will be returned from the "host" [`Coroutine`]
-   /// whenever the game is finally over.
+   /// The type representing the final outcome of the game. This will be returned from the "host"
+   /// [`Coroutine`](genawaiter::Coroutine) whenever the game is finally over.
    type Outcome : Sized;
 
    /// Coroutine responsible for running the game. Think of this as the `main` function of the game. The implementation
@@ -57,7 +57,7 @@ pub trait Play : Sized {
    /// presented to the player. Doing this will yield control back to the main application (and typically the UI layer)
    /// to respond to the event in some way, e.g. by playing an animation, triggering a sound effect, asking the player
    /// for input, etc. Execution will be paused until execution is resumed by the main application using
-   /// [`Co::resume_with`]
+   /// [`Generator::resume`](genawaiter::Generator::resume).
    fn play(ctx : Context<Self>) -> impl Future<Output = Self::Outcome>;
 
    /// Allows the game to update state in response to an event emitted internally from [`play`](Play::play) or supplied
