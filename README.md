@@ -30,13 +30,13 @@ To use `posturn`, simply add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-posturn = "0.1.1"
+posturn = "0.2.0"
 ```
 
 Alternatively, run the following from your crate root:
 
 ```ps1
-cargo add posturn@0.1.1
+cargo add posturn@0.2.0
 ```
 
 ## ⚠️ Compatibility
