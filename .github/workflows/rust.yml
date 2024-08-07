@@ -21,6 +21,12 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
+    - name: Install cargo-msrv
+      run: cargo install cargo-msrv
+
+    - name: Verify minimum supported Rust version
+      run: cargo msrv --output-format json verify -- cargo check
+
     - name: Build
       run: cargo build --verbose
 
