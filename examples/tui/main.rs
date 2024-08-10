@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2024 Andrew T. Christensen <andrew@andrewtc.com>
+//
+// SPDX-License-Identifier: MIT
+
 mod game;
 use game::TicTacToe;
 

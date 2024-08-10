@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2024 Andrew T. Christensen <andrew@andrewtc.com>
+//
+// SPDX-License-Identifier: MIT
+
 use std::{borrow::Borrow, io};
 
 use crossterm::{cursor, event::{self, KeyCode}, queue, style, terminal};

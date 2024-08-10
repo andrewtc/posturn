@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2024 Andrew T. Christensen <andrew@andrewtc.com>
+//
+// SPDX-License-Identifier: MIT
+
 use std::u16;
 
 /// Represents a player or player piece in a game of [`TicTacToe`].
