@@ -23,7 +23,9 @@ ready to continue, the UI resumes the turn-based game, supplying any player inpu
 This approach has the advantage of keeping all UI logic separate from turn-based game code. Theoretically, a game
 written in this way could be used with _any_ frontend capable of processing the events emitted by the game.
 
-For a simple example, see the simple [`RoShamBo`](/src/tests.rs) game included with this library.
+For a very simple example, see [`RoShamBo`](/src/tests.rs) in the `tests` module.
+
+For a complete, interactive game built with `posturn`, see [`examples/tui`](/examples/tui/README.md).
 
 ## 📃 Usage
 To use `posturn`, simply add this to your `Cargo.toml`:
