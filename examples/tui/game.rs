@@ -15,6 +15,15 @@ pub enum Player {
    O,
 }
 
+impl std::fmt::Display for Player {
+   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+      f.write_str(match self {
+         Self::X => "X",
+         Self::O => "O",
+      })
+   }
+}
+
 impl Player {
    /// Returns the next player in the turn order.
    fn next(&self) -> Self {
@@ -231,6 +240,11 @@ impl TicTacToe {
          }
       }
       owner
+   }
+
+   /// Returns the player whose turn it is.
+   pub fn current_player(&self) -> Player {
+      self.current_player
    }
 
    /// Borrows the tile at the specified [`Pos`] on the game board.

@@ -6,7 +6,7 @@ use std::{borrow::Borrow, io};
 
 use crossterm::{cursor, event::{self, KeyCode}, queue, style::{self, Stylize}, terminal};
 
-use crate::game::{Outcome, Player, Pos, TicTacToe};
+use crate::game::{Outcome, Pos, TicTacToe};
 
 pub enum Event {
    /// The player wants to start a new game of Tic Tac Toe.
@@ -61,10 +61,10 @@ ENTER : Claim a tile
  ←↑→↓ : Move cursor
   ESC : Quit";
    
-   /// The row, column position of the top, leftmost **tile** on the game board.
-   const CONTROLS_TOP_LEFT : (u16, u16) = (17, 4);
+   /// The row, column position of the top left corner of the prompt text.
+   const PROMPT_TOP_LEFT : (u16, u16) = (17, 3);
 
-   const GAME_OVER_PROMPT : &'static str = "  GAME OVER!
+   const GAME_OVER_PROMPT : &'static str = "\
 ENTER: Play again
   ESC: Quit";
 
@@ -176,11 +176,21 @@ ENTER: Play again
       Self::write_at(out, Self::TOP_LEFT, Self::PROMPT_MAX_WIDTH, Self::BG_TEXT)?;
 
       let outcome = game.outcome();
-      if outcome.is_some() {
-         Self::write_at(out, Self::CONTROLS_TOP_LEFT, Self::PROMPT_MAX_WIDTH, Self::GAME_OVER_PROMPT)?;
+      if let Some(outcome) = outcome {
+         // Display who won to the player.
+         let win_text = match outcome {
+            Outcome::CatsGame => "Cat's Game".to_owned(),
+            Outcome::Win(player, _) => format!("  {player}'s win!"),
+         };
+
+         let prompt = format!("  GAME OVER\n {win_text}\n\n{}", Self::GAME_OVER_PROMPT);
+         Self::write_at(out, Self::PROMPT_TOP_LEFT, Self::PROMPT_MAX_WIDTH, prompt)?;
       }
       else {
-         Self::write_at(out, Self::CONTROLS_TOP_LEFT, Self::PROMPT_MAX_WIDTH, Self::CONTROLS_PROMPT)?;
+         // Let the player know whose turn it is.
+         let player = game.current_player();
+         let prompt = format!("   {player}'s turn\n\n{}", Self::CONTROLS_PROMPT);
+         Self::write_at(out, Self::PROMPT_TOP_LEFT, Self::PROMPT_MAX_WIDTH, prompt)?;
       }
 
       // Draw all pieces on the board.
@@ -189,16 +199,14 @@ ENTER: Play again
             let pos : Pos = (col, row).try_into().unwrap();
             if let Some(player) = game.tile(pos) {
                let tile_pos = Self::calc_tile_pos((col, row));
-               let piece = match player {
-                  Player::X => 'X',
-                  Player::O => 'O',
-               };
+               let piece = format!("{}", player);
                
-               let stylized_piece = if let Some(Outcome::Win(_, line)) = outcome {
-                  if line.contains(&pos) { piece.bold() } else { piece.dim() }
-               }
-               else {
-                  piece.white()
+               let stylized_piece = match outcome {
+                  Some(Outcome::Win(_, line)) => {
+                     if line.contains(&pos) { piece.bold() } else { piece.dim() }
+                  },
+                  Some(Outcome::CatsGame) => piece.dim(),
+                  _ => piece.white(),
                };
 
                queue!(
