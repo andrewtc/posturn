@@ -29,13 +29,18 @@ impl Player {
 pub type Board = [Option<Player>; (TicTacToe::BOARD_SIZE * TicTacToe::BOARD_SIZE) as usize];
 
 /// Represents a position on a [`TicTacToe`] game board. Guaranteed to be valid.
-#[derive(Debug, Default)]
+#[derive(Clone, Copy, Debug, Default)]
 pub struct Pos(u16, u16);
 
 impl Pos {
    /// Calculates the index of the tile to which a [`Pos`] corresponds. Guaranteed to be valid.
    pub fn index(&self) -> usize {
       ((self.1 * TicTacToe::BOARD_SIZE) + self.0) as usize
+   }
+
+   /// Returns a new [`Pos`] that is the same, except with the row flipped.
+   pub fn flip_row(&self) -> Pos {
+      Self(self.0, TicTacToe::BOARD_SIZE - self.1 - 1)
    }
 }
 
@@ -78,6 +83,21 @@ pub enum Line {
    Diagonal(bool),
 }
 
+impl Line {
+   /// Returns `true` if the [`Line`] overlaps with `pos` on a [`TicTacToe`] board. If `pos` does **not** overlap,
+   /// returns `false`.
+   pub fn contains(&self, pos : &Pos) -> bool {
+      match self {
+         Line::Row(row) => pos.1 == *row,
+         Line::Col(col) => pos.0 == *col,
+         Line::Diagonal(flip_row) => {
+            let flipped = if *flip_row { pos.flip_row() } else { *pos };
+            flipped.0 == flipped.1
+         },
+      }
+   }
+}
+
 impl IntoIterator for Line {
    type Item = Pos;
    type IntoIter = TilesInLine;
@@ -109,13 +129,13 @@ impl Iterator for TilesInLine {
       let offset = self.next_offset;
       self.next_offset += 1;
       match self.line {
-         Line::Row(row) => (offset, row),
-         Line::Col(col) => (col, offset),
+         Line::Row(row) => (offset, row).try_into().ok(),
+         Line::Col(col) => (col, offset).try_into().ok(),
          Line::Diagonal(flip_row) => {
-            let row = if flip_row { offset } else { (TicTacToe::BOARD_SIZE - 1).checked_sub(offset)? };
-            (offset, row)
+            let pos = (offset, offset).try_into().ok();
+            if flip_row { pos.and_then(|pos : Pos| Some(pos.flip_row())) } else { pos }
          },
-      }.try_into().ok()
+      }
    }
 }
 

@@ -4,9 +4,9 @@
 
 use std::{borrow::Borrow, io};
 
-use crossterm::{cursor, event::{self, KeyCode}, queue, style, terminal};
+use crossterm::{cursor, event::{self, KeyCode}, queue, style::{self, Stylize}, terminal};
 
-use crate::game::{Player, Pos, TicTacToe};
+use crate::game::{Outcome, Player, Pos, TicTacToe};
 
 pub enum Event {
    /// The player wants to start a new game of Tic Tac Toe.
@@ -175,8 +175,8 @@ ENTER: Play again
 
       Self::write_at(out, Self::TOP_LEFT, Self::PROMPT_MAX_WIDTH, Self::BG_TEXT)?;
 
-      let is_game_over = game.outcome().is_some();
-      if is_game_over {
+      let outcome = game.outcome();
+      if outcome.is_some() {
          Self::write_at(out, Self::CONTROLS_TOP_LEFT, Self::PROMPT_MAX_WIDTH, Self::GAME_OVER_PROMPT)?;
       }
       else {
@@ -193,7 +193,22 @@ ENTER: Play again
                   Player::X => 'X',
                   Player::O => 'O',
                };
-               queue!(out, cursor::MoveTo(tile_pos.0, tile_pos.1), style::Print(piece))?;
+               
+               let stylized_piece = if let Some(Outcome::Win(_, line)) = outcome {
+                  if line.contains(&pos) { piece.bold() } else { piece.dim() }
+               }
+               else {
+                  piece.white()
+               };
+
+               queue!(
+                  out,
+                  cursor::MoveTo(tile_pos.0, tile_pos.1),
+                  style::PrintStyledContent(stylized_piece),
+
+                  // This fixes a bug in some terminals where the background color gets reset by PrintStyledContent.
+                  style::SetBackgroundColor(style::Color::DarkBlue),
+               )?;
             }
          }
       }
@@ -201,7 +216,7 @@ ENTER: Play again
       // Whenever we redraw, we update the cursor position to show the selected tile.
       let (cursor_x, cursor_y) = Self::calc_tile_pos(self.selected_tile);
    
-      if is_game_over {
+      if outcome.is_some() {
          // Hide the cursor to indicate that cursor input is no longer being accepted.
          queue!(out, cursor::Hide)
       }
