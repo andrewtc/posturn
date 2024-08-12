@@ -92,23 +92,47 @@ impl<Game> Host<Game> where
       self.with_game(|game| game.clone())
    }
 
+   /// Grants temporary read access to the shared game state via a [`Ref`].
+   /// 
+   /// # Safety
+   /// This function will panic if the game state is already being accessed by any of the `*_game` family of functions.
+   /// 
+   /// Be careful about using this `fn` as the game state will remain locked for as long as the [`Ref`] exists. Using
+   /// [`with_game`](Self::with_game) may be more ergonomic if you want control over the lifetime of the transaction.
+   /// 
+   pub fn borrow_game(&'_ self) -> Ref<'_, Game> {
+      Ref::map((*self.state).borrow(), |state| &state.game)
+   }
+
+   /// Grants temporary write access to the shared game state via a [`RefMut`].
+   /// 
+   /// # Safety
+   /// This function will panic if the game state is already being accessed by any of the `*_game` family of functions.
+   /// 
+   /// Be careful about using this `fn` as the game state will remain locked for as long as the [`RefMut`] exists.
+   /// Using [`with_game_mut`](Self::with_game) may be more ergonomic if you want control over the lifetime of the
+   /// transaction.
+   /// 
+   pub fn borrow_game_mut(&'_ self) -> RefMut<'_, Game> {
+      RefMut::map((*self.state).borrow_mut(), |state| &mut state.game)
+   }
+
    /// Grants temporary read access to the shared game state via a [`FnOnce`] transaction. 
    /// 
    /// # Safety
-   /// This function will panic if the game state is already being accessed, i.e. if a transaction attempts to call
+   /// This function will panic if the game state is already being accessed, e.g. if a transaction attempts to call
    /// [`with_game`](Self::with_game) or [`with_game_mut`](Self::with_game_mut) from inside itself.
    /// 
    pub fn with_game<F, R>(&'_ self, transact : F) -> R where
       for<'r> F : FnOnce(Ref<'r, Game>) -> R
    {
-      let borrowed = Ref::map((*self.state).borrow(), |state| &state.game);
-      transact(borrowed)
+      transact(self.borrow_game())
    }
 
    /// Grants temporary write access to the shared game state via a [`FnOnce`] transaction. 
    /// 
    /// # Safety
-   /// This function will panic if the game state is already being accessed, i.e. if a transaction attempts to call
+   /// This function will panic if the game state is already being accessed, e.g. if a transaction attempts to call
    /// [`with_game`](Self::with_game) or [`with_game_mut`](Self::with_game_mut) from inside itself.
    /// 
    pub fn with_game_mut<F, R>(&'_ self, transact : F) -> R where

@@ -271,7 +271,7 @@ impl posturn::Play for TicTacToe {
          loop {
             let next_event = last_turn_result.map(|_| {
                // Ask the player for an input.
-               let current_player = ctx.host.with_game(|game| game.current_player);
+               let current_player = ctx.host.borrow_game().current_player;
                current_player
             });
 
@@ -279,14 +279,14 @@ impl posturn::Play for TicTacToe {
             let pos = ctx.yield_event(next_event).await.into();
 
             // Attempt to place a piece for the current player.
-            last_turn_result = ctx.host.with_game_mut(|mut game| game.take_turn(pos));
+            last_turn_result = ctx.host.borrow_game_mut().take_turn(pos);
 
             if last_turn_result.is_err() {
                continue;
             }
             else if let Some(outcome) = ctx.host.with_game(|game| game.check_outcome()) {
                // Game over!
-               ctx.host.with_game_mut(|mut game| game.outcome = Some(outcome));
+               ctx.host.borrow_game_mut().outcome = Some(outcome);
                return outcome;
             }
          }
