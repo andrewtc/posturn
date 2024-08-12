@@ -51,22 +51,23 @@ impl View {
    
    /// The total number of tiles on the game board in each direction (columns, rows).
    const NUM_TILES : (u16, u16) = (3, 3);
+   
+   /// The row, column position of the top left corner of the prompt text.
+   const PROMPT_TOP_LEFT : (u16, u16) = (17, 2);
 
    /// Used to pad the characters written in the prompt area.
    const PROMPT_MAX_WIDTH : usize = 20;
 
    /// The text displaying controls to the player.
    const CONTROLS_PROMPT : &'static str = "\
-ENTER : Claim a tile
+ENTER : Claim tile
  ←↑→↓ : Move cursor
+  END : New game
   ESC : Quit";
-   
-   /// The row, column position of the top left corner of the prompt text.
-   const PROMPT_TOP_LEFT : (u16, u16) = (17, 3);
 
-   const GAME_OVER_PROMPT : &'static str = "\
-ENTER: Play again
-  ESC: Quit";
+   const GAME_OVER_PROMPT : &'static str = "
+  END : New game
+  ESC : Quit";
 
    /// Creates and returns a new terminal UI for a Tic Tac Toe game.
    pub fn new(terminal_size : (u16, u16)) -> Self {
@@ -114,8 +115,9 @@ ENTER: Play again
       let mut tile_to_select = self.selected_tile;
 
       match code {
-         KeyCode::Esc => {
-            return Some(Event::Quit);
+         KeyCode::Enter => {
+            // Place a piece on the game board.
+            return Some(Event::TakeTurn(tile_to_select.0, tile_to_select.1));
          },
          KeyCode::Right => {
             tile_to_select.0 = tile_to_select.0.saturating_add(1);
@@ -129,9 +131,11 @@ ENTER: Play again
          KeyCode::Up => {
             tile_to_select.1 = tile_to_select.1.saturating_sub(1);
          },
-         KeyCode::Enter => {
-            // Place a piece on the game board.
-            return Some(Event::TakeTurn(tile_to_select.0, tile_to_select.1));
+         KeyCode::End => {
+            return Some(Event::NewGame)
+         },
+         KeyCode::Esc => {
+            return Some(Event::Quit);
          },
          _ => ()
       }
@@ -143,8 +147,8 @@ ENTER: Play again
    /// Processes input between games of Tic Tac Toe. Returns an [`Event`] that is processed by the main application.
    fn handle_game_over_key_press(&self, code : KeyCode) -> Option<Event> {
       match code {
+         KeyCode::End => Some(Event::NewGame),
          KeyCode::Esc => Some(Event::Quit),
-         KeyCode::Enter => Some(Event::NewGame),
          _ => None
       }
    }
