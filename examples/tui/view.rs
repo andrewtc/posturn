@@ -183,7 +183,7 @@ ENTER : Claim tile
       if let Some(outcome) = outcome {
          // Display who won to the player.
          let win_text = match outcome {
-            Outcome::CatsGame => "Cat's Game".to_owned(),
+            Outcome::CatsGame => "Cat's Game!".to_owned(),
             Outcome::Win(player, _) => format!("  {player}'s win!"),
          };
 
