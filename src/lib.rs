@@ -25,6 +25,17 @@ pub struct Context<Game> where
 impl<Game> Context<Game> where
    Game : Play,
 {
+   /// Yields execution back to the main game loop, passing along the default [`Event`](Play::Event). The game will
+   /// have a chance to react with [`handle_event`](Play::handle_event) before the event is broadcast.
+   /// 
+   /// ⚠️ **IMPORTANT:** Please remember to immediately `await` the `Future` returned by this function.
+   /// 
+   pub fn yield_default(&self) -> impl Future<Output = Game::Input> + '_ where
+      Game::Event : Default,
+   {
+      self.yield_event(Default::default())
+   }
+
    /// Raises an [`Event`](Play::Event) to be processed outside of the turn-based game loop. The game itself will have
    /// the chance to react with [`handle_event`](Play::handle_event) before broadcasting.
    /// 
