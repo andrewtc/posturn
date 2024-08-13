@@ -41,9 +41,9 @@ impl<Game> Context<Game> where
    /// 
    /// ⚠️ **IMPORTANT:** Please remember to immediately `await` the `Future` returned by this function.
    /// 
-   pub fn yield_event(&self, event : Game::Event) -> impl Future<Output = Game::Input> + '_ {
+   pub fn yield_event(&self, mut event : Game::Event) -> impl Future<Output = Game::Input> + '_ {
       // Allow the game to update itself in response to the event being emitted.
-      self.host.process_event(&event);
+      self.host.process_event(&mut event);
 
       // "Yield" the event by returning a Future that will wait for the coroutine to be resumed.
       self.co.yield_(event)
@@ -71,7 +71,8 @@ pub trait Play : Sized {
    /// [`Generator::resume`](genawaiter::Generator::resume).
    fn play(ctx : Context<Self>) -> impl Future<Output = Self::Outcome>;
 
-   /// Allows the game to update state in response to an event emitted internally from [`play`](Play::play) or supplied
-   /// externally via [`Host::process_event`].
-   fn handle_event(&mut self, _event : &<Self as Play>::Event) { }
+   /// Allows the game to update state in response to an [`Event`](Play::Event) emitted internally from
+   /// [`play`](Play::play) or supplied externally via [`Host::process_event`]. The event is mutable so that the
+   /// implementation can consume or otherwise modify it, if desired.
+   fn handle_event(&mut self, _event : &mut <Self as Play>::Event) { }
 }

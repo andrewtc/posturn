@@ -150,8 +150,8 @@ impl<Game> Host<Game> where
    /// server can generate events and replicate them to the client, which can then process these same events to update
    /// its own game state.
    /// 
-   pub fn process_event(&self, event : &<Game as Play>::Event) {
-      self.with_game_mut(|mut game| game.handle_event(&event))
+   pub fn process_event(&self, mut event : &mut <Game as Play>::Event) {
+      self.with_game_mut(|mut game| game.handle_event(&mut event))
    }
 }
 

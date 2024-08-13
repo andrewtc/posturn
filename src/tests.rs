@@ -91,7 +91,7 @@ impl Play for RoShamBo {
       }
    }
 
-   fn handle_event(&mut self, event : &<Self as Play>::Event) {
+   fn handle_event(&mut self, event : &mut <Self as Play>::Event) {
       // For easier debugging of tests, print messages to the console. Use `cargo test -- --nocapture` to display these.
       println!("{}", event.0)
    }
