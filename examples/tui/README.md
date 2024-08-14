@@ -11,7 +11,7 @@ This example demonstrates how to build a full terminal-based `TicTacToe` game us
 
 All code in this example is divided into three files:
  - [`game.rs`](game.rs): Defines logic for running the turn-based game (`TicTacToe`), but not for displaying it
- - [`view.rs`](view.rs): Contains purely TUI logic for displaying the `TicTacToe` game (`View`)
+ - [`view.rs`](view.rs): Contains purely [TUI](https://en.wikipedia.org/wiki/Text-based_user_interface) logic for displaying and processing input for the `TicTacToe` game (`View`)
  - [`main.rs`](main.rs): The `main` application, which passes execution between the `Host` and the `View` during play
 
 The goal is to maintain a clean separation between all game logic (`TicTacToe`) and UI logic (`View`). This is an area
