@@ -19,5 +19,6 @@ exclude = [".*", "examples"]
 genawaiter = "^0.99"
 
 [dev-dependencies]
+macroquad = "^0.4"
 crossterm = "^0.26"
 futures = "^0.3"
