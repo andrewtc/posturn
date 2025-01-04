@@ -41,6 +41,41 @@ async fn main() {
             Segment(Direction::East, 1)
          ],
          BLUE);
+         
+      draw_snake(
+         (15,25),
+         &vec![
+            Segment(Direction::South, 2),
+            Segment(Direction::East, 2),
+            Segment(Direction::North, 2),
+            Segment(Direction::East, 2),
+            Segment(Direction::South, 2),
+            Segment(Direction::East, 2),
+            Segment(Direction::North, 2),
+            Segment(Direction::East, 2)
+         ],
+         PURPLE);
+         
+      draw_snake(
+         (11,10),
+         &vec![
+            Segment(Direction::North, 2),
+            Segment(Direction::East, 2),
+            Segment(Direction::North, 2),
+            Segment(Direction::West, 2),
+            Segment(Direction::North, 2),
+            Segment(Direction::East, 2),
+            Segment(Direction::North, 2),
+            Segment(Direction::West, 2)
+         ],
+         RED);
+         
+         draw_snake(
+            (40,30),
+            &vec![
+               Segment(Direction::West, 8),
+            ],
+            YELLOW);
 
       next_frame().await;
    }

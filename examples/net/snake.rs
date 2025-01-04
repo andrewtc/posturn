@@ -38,6 +38,23 @@ fn draw_circle_at_tile(tile_pos : (i16, i16), color : Color) {
    draw_circle(draw_x, draw_y, TILE_SIZE / 2 as f32, color);
 }
 
+fn draw_head_at_tile(tile_pos : (i16, i16), direction : Direction, color : Color) {
+   draw_circle_at_tile(tile_pos, color);
+   let (center_x, center_y) = grid_to_window(tile_pos);
+
+   const EYE_RADIUS : f32 = TILE_SIZE / 8f32;
+   let (eye_offset_x, eye_offset_y) = match direction {
+      Direction::West  => (0f32, EYE_RADIUS * 2f32),
+      Direction::East  => (0f32, EYE_RADIUS * -2f32),
+      Direction::North => (EYE_RADIUS * 2f32, 0f32),
+      Direction::South => (EYE_RADIUS * -2f32, 0f32),
+   };
+
+   const EYE_COLOR : Color = BLACK;
+   draw_circle(center_x + eye_offset_x, center_y + eye_offset_y, EYE_RADIUS, EYE_COLOR);
+   draw_circle(center_x - eye_offset_x, center_y - eye_offset_y, EYE_RADIUS, EYE_COLOR);
+}
+
 fn draw_segment(start : (i16, i16), segment : Segment, color : Color) {
    let (start_x, start_y) = grid_to_window(start);
    let (end_x, end_y) = grid_to_window(start + segment);
@@ -47,9 +64,6 @@ fn draw_segment(start : (i16, i16), segment : Segment, color : Color) {
 pub fn draw_snake(start : (i16, i16), segments : &Vec<Segment>, color : Color) {
    let (mut tile_x, mut tile_y) = start;
 
-   // Draw the head.
-   draw_circle_at_tile((tile_x, tile_y), color);
-
    // Draw the body.
    for segment in segments {
       draw_segment((tile_x, tile_y), *segment, color);
@@ -57,4 +71,9 @@ pub fn draw_snake(start : (i16, i16), segments : &Vec<Segment>, color : Color) {
       (tile_x, tile_y) = (tile_x, tile_y) + *segment;
       draw_circle_at_tile((tile_x, tile_y), color);
    }
+
+   // Draw the head.
+   let (head_x, head_y) = start;
+   let direction = segments.first().copied().map(|segment| segment.0).unwrap_or(Direction::North);
+   draw_head_at_tile((head_x, head_y), direction, color);
 }
