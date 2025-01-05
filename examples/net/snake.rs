@@ -1,4 +1,4 @@
-use std::ops::Add;
+use std::{collections::VecDeque, ops::Add};
 
 use macroquad::prelude::*;
 
@@ -10,6 +10,17 @@ pub enum Direction {
    East,
    North,
    South
+}
+
+impl Direction {
+   pub fn opposite(&self) -> Self {
+      match self {
+         Self::West => Self::East,
+         Self::East => Self::West,
+         Self::North => Self::South,
+         Self::South => Self::North,
+      }
+   }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -26,6 +37,40 @@ impl Add<Segment> for (i16, i16) {
          Direction::North => (tile_x, tile_y - tile_size as i16),
          Direction::South => (tile_x, tile_y + tile_size as i16),
       }
+   }
+}
+
+#[derive(Debug)]
+pub struct Snake {
+   pub start : (i16, i16),
+   pub segments : VecDeque<Segment>,
+   pub color : Color,
+}
+
+impl Snake {
+   pub fn step(&mut self) {
+      self.start = self.start + Segment(self.facing(), 1);
+
+      if let Some(&mut Segment(_, ref mut size)) = self.segments.front_mut() {
+         *size += 1;
+      }
+
+      let last_segment_is_empty =
+         if let Some(&mut Segment(_, ref mut size)) = self.segments.back_mut() {
+            *size = size.saturating_sub(1);
+            *size == 0
+         }
+         else { false };
+      
+      if last_segment_is_empty {
+         self.segments.pop_back();
+      }
+   }
+
+   pub fn facing(&self) -> Direction {
+      self.segments.front()
+         .map(|segment| segment.0.opposite())
+         .unwrap_or(Direction::North)
    }
 }
 
@@ -67,19 +112,20 @@ fn draw_segment(start : (i16, i16), segment : Segment, color : Color) {
    draw_line(start_x, start_y, end_x, end_y, TILE_SIZE as f32, color);
 }
 
-pub fn draw_snake(start : (i16, i16), segments : &Vec<Segment>, color : Color) {
-   let (mut tile_x, mut tile_y) = start;
+pub fn draw_snake(snake : &Snake) {
+   let (mut tile_x, mut tile_y) = snake.start;
 
    // Draw the body.
-   for segment in segments {
-      draw_segment((tile_x, tile_y), *segment, color);
+   for segment in &snake.segments {
+      draw_segment((tile_x, tile_y), *segment, snake.color);
 
       (tile_x, tile_y) = (tile_x, tile_y) + *segment;
-      draw_circle_at_tile((tile_x, tile_y), color);
+      draw_circle_at_tile((tile_x, tile_y), snake.color);
    }
 
    // Draw the head.
-   let (head_x, head_y) = start;
-   let direction = segments.first().copied().map(|segment| segment.0).unwrap_or(Direction::North);
-   draw_head_at_tile((head_x, head_y), direction, color);
+   let (head_x, head_y) = snake.start;
+   let facing = snake.facing();
+
+   draw_head_at_tile((head_x, head_y), facing, snake.color);
 }
