@@ -4,7 +4,7 @@ use macroquad::prelude::*;
 
 const TILE_SIZE : f32 = 16f32;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Direction {
    West,
    East,
@@ -43,16 +43,27 @@ impl Add<Segment> for (i16, i16) {
 #[derive(Debug)]
 pub struct Snake {
    pub start : (i16, i16),
+   pub facing : Direction,
    pub segments : VecDeque<Segment>,
    pub color : Color,
 }
 
 impl Snake {
    pub fn step(&mut self) {
-      self.start = self.start + Segment(self.facing(), 1);
+      self.start = self.start + Segment(self.facing, 1);
 
-      if let Some(&mut Segment(_, ref mut size)) = self.segments.front_mut() {
-         *size += 1;
+      let needs_new_segment =
+         if let Some(&mut Segment(direction, ref mut size)) = self.segments.front_mut() {
+            if direction.opposite() == self.facing {
+               *size += 1;
+               false
+            }
+            else { true }
+         }
+         else { false };
+
+      if needs_new_segment {
+         self.segments.push_front(Segment(self.facing.opposite(), 1));
       }
 
       let last_segment_is_empty =
@@ -65,12 +76,6 @@ impl Snake {
       if last_segment_is_empty {
          self.segments.pop_back();
       }
-   }
-
-   pub fn facing(&self) -> Direction {
-      self.segments.front()
-         .map(|segment| segment.0.opposite())
-         .unwrap_or(Direction::North)
    }
 }
 
@@ -125,7 +130,7 @@ pub fn draw_snake(snake : &Snake) {
 
    // Draw the head.
    let (head_x, head_y) = snake.start;
-   let facing = snake.facing();
+   let facing = snake.facing;
 
    draw_head_at_tile((head_x, head_y), facing, snake.color);
 }

@@ -13,6 +13,7 @@ async fn main() {
    let snakes = vec![
       Snake {
          start: (1,2),
+         facing: Direction::East,
          segments: vec![
             Segment(Direction::South, 3),
             Segment(Direction::East, 8),
@@ -23,6 +24,7 @@ async fn main() {
       },
       Snake {
          start: (30,10),
+         facing: Direction::East,
          segments: vec![
             Segment(Direction::North, 5),
             Segment(Direction::West, 3),
@@ -33,6 +35,7 @@ async fn main() {
       },
       Snake {
          start: (15,25),
+         facing: Direction::North,
          segments: vec![
             Segment(Direction::South, 2),
             Segment(Direction::East, 2),
@@ -47,6 +50,7 @@ async fn main() {
       },
       Snake {
          start: (11,10),
+         facing: Direction::West,
          segments: vec![
             Segment(Direction::North, 2),
             Segment(Direction::East, 2),
@@ -61,6 +65,7 @@ async fn main() {
       },
       Snake {
          start: (40,30),
+         facing: Direction::North,
          segments: vec![
             Segment(Direction::West, 8),
          ].into(),
