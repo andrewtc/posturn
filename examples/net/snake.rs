@@ -42,17 +42,23 @@ fn draw_head_at_tile(tile_pos : (i16, i16), direction : Direction, color : Color
    draw_circle_at_tile(tile_pos, color);
    let (center_x, center_y) = grid_to_window(tile_pos);
 
-   const EYE_RADIUS : f32 = TILE_SIZE / 8f32;
+   const EYE_RADIUS : f32 = TILE_SIZE / 4f32;
+   const EYE_SPACING : f32 = EYE_RADIUS * 1.5f32;
    let (eye_offset_x, eye_offset_y) = match direction {
-      Direction::West  => (0f32, EYE_RADIUS * 2f32),
-      Direction::East  => (0f32, EYE_RADIUS * -2f32),
-      Direction::North => (EYE_RADIUS * 2f32, 0f32),
-      Direction::South => (EYE_RADIUS * -2f32, 0f32),
+      Direction::West  => (0f32, EYE_SPACING),
+      Direction::East  => (0f32, -EYE_SPACING),
+      Direction::North => (EYE_SPACING, 0f32),
+      Direction::South => (-EYE_SPACING, 0f32),
    };
 
-   const EYE_COLOR : Color = BLACK;
+   const EYE_COLOR : Color = WHITE;
    draw_circle(center_x + eye_offset_x, center_y + eye_offset_y, EYE_RADIUS, EYE_COLOR);
    draw_circle(center_x - eye_offset_x, center_y - eye_offset_y, EYE_RADIUS, EYE_COLOR);
+
+   const PUPIL_RADIUS : f32 = EYE_RADIUS / 2f32;
+   const PUPIL_COLOR : Color = BLACK;
+   draw_circle(center_x + eye_offset_x, center_y + eye_offset_y, PUPIL_RADIUS, PUPIL_COLOR);
+   draw_circle(center_x - eye_offset_x, center_y - eye_offset_y, PUPIL_RADIUS, PUPIL_COLOR);
 }
 
 fn draw_segment(start : (i16, i16), segment : Segment, color : Color) {
