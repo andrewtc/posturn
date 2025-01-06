@@ -100,7 +100,7 @@ async fn main() {
          };
       }
 
-      const TURN_TIMER_DURATION : Duration = Duration::from_millis(50);
+      const TURN_TIMER_DURATION : Duration = Duration::from_millis(75);
       if let Some(ref mut next_turn_time) = &mut turn_timer {
          if *next_turn_time <= Instant::now() {
             *next_turn_time += TURN_TIMER_DURATION;
