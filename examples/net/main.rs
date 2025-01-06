@@ -1,6 +1,8 @@
 mod game;
 mod snake;
 
+use std::time::{Duration, Instant};
+
 use futures::pin_mut;
 use game::Game;
 use genawaiter::Generator;
@@ -80,9 +82,25 @@ async fn main() {
    let co = host.play().unwrap();
    pin_mut!(co);
 
+   co.as_mut().resume();
+
+   const KEY_NEXT_TURN : KeyCode = KeyCode::Space;
+   const TURN_TIMER_DURATION : Duration = Duration::from_millis(50);
+   let mut turn_timer = None;
+
    loop {
-      if is_key_pressed(KeyCode::Space) {
-         co.as_mut().resume();
+      if is_key_pressed(KEY_NEXT_TURN) {
+         turn_timer = Some(Instant::now());
+      }
+      else if is_key_released(KEY_NEXT_TURN) {
+         turn_timer = None;
+      }
+
+      if let Some(ref mut next_turn_time) = &mut turn_timer {
+         if *next_turn_time <= Instant::now() {
+            *next_turn_time += TURN_TIMER_DURATION;
+            co.as_mut().resume();
+         }
       }
 
       const BG_COLOR : Color = Color::new(0.73, 0.4, 0.17, 1f32);
