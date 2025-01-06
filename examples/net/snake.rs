@@ -13,12 +13,39 @@ pub enum Direction {
 }
 
 impl Direction {
-   pub fn opposite(&self) -> Self {
+   pub const fn opposite(&self) -> Self {
       match self {
          Self::West => Self::East,
          Self::East => Self::West,
          Self::North => Self::South,
          Self::South => Self::North,
+      }
+   }
+
+   pub const fn cw(&self) -> Self {
+      match self {
+         Self::West => Self::North,
+         Self::East => Self::South,
+         Self::North => Self::East,
+         Self::South => Self::West,
+      }
+   }
+
+   pub const fn ccw(&self) -> Self {
+      match self {
+         Self::West => Self::South,
+         Self::East => Self::North,
+         Self::North => Self::West,
+         Self::South => Self::East,
+      }
+   }
+
+   pub const fn delta(&self) -> (i16, i16) {
+      match self {
+         Self::West => (-1, 0),
+         Self::East => (1, 0),
+         Self::North => (0, -1),
+         Self::South => (0, 1),
       }
    }
 }
@@ -40,6 +67,13 @@ impl Add<Segment> for (i16, i16) {
    }
 }
 
+impl Add<Direction> for (i16, i16) {
+   type Output = Self;
+   fn add(self, direction: Direction) -> Self::Output {
+      self + Segment(direction, 1)
+   }
+}
+
 #[derive(Debug)]
 pub struct Snake {
    pub start : (i16, i16),
@@ -50,7 +84,7 @@ pub struct Snake {
 
 impl Snake {
    pub fn step(&mut self) {
-      self.start = self.start + Segment(self.facing, 1);
+      self.start = self.start + self.facing;
 
       let needs_new_segment =
          if let Some(&mut Segment(direction, ref mut size)) = self.segments.front_mut() {
@@ -80,7 +114,8 @@ impl Snake {
 }
 
 pub fn grid_to_window(tile_pos : (i16, i16)) -> (f32, f32) {
-   ((tile_pos.0 as f32 + 0.5) * TILE_SIZE, (tile_pos.1 as f32 + 0.5) * TILE_SIZE)
+   let (screen_half_width, screen_half_height) = (0.5 * screen_width(), 0.5 * screen_height());
+   (screen_half_width + tile_pos.0 as f32 * TILE_SIZE, screen_half_height + tile_pos.1 as f32 * TILE_SIZE)
 }
 
 fn draw_circle_at_tile(tile_pos : (i16, i16), color : Color) {

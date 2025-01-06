@@ -12,9 +12,12 @@ use snake::{draw_snake, Direction, Segment, Snake};
 
 #[macroquad::main("Out West!")]
 async fn main() {
+   const PLAY_AREA_HALF_EXTENTS : (u8, u8) = (20, 15);
+   const RANDOM_SEED : u64 = 12345;
+
    let snakes = vec![
       Snake {
-         start: (1,2),
+         start: (-19,-13),
          facing: Direction::East,
          segments: vec![
             Segment(Direction::South, 3),
@@ -25,7 +28,7 @@ async fn main() {
          color: GREEN,
       },
       Snake {
-         start: (30,10),
+         start: (10,-5),
          facing: Direction::East,
          segments: vec![
             Segment(Direction::North, 5),
@@ -36,7 +39,7 @@ async fn main() {
          color: BLUE,
       },
       Snake {
-         start: (15,25),
+         start: (5,10),
          facing: Direction::North,
          segments: vec![
             Segment(Direction::South, 2),
@@ -51,7 +54,7 @@ async fn main() {
          color: PURPLE,
       },
       Snake {
-         start: (11,10),
+         start: (-9,-5),
          facing: Direction::West,
          segments: vec![
             Segment(Direction::North, 2),
@@ -66,7 +69,7 @@ async fn main() {
          color: RED,
       },
       Snake {
-         start: (40,30),
+         start: (20,15),
          facing: Direction::North,
          segments: vec![
             Segment(Direction::West, 8),
@@ -76,6 +79,8 @@ async fn main() {
    ];
 
    let host = posturn::Host::new(Game {
+      play_area_half_extents: PLAY_AREA_HALF_EXTENTS,
+      random_seed: RANDOM_SEED,
       snakes,
    });
 
