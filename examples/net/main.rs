@@ -89,18 +89,18 @@ async fn main() {
 
    co.as_mut().resume();
 
-   const KEY_NEXT_TURN : KeyCode = KeyCode::Space;
-   const TURN_TIMER_DURATION : Duration = Duration::from_millis(50);
-   let mut turn_timer = None;
+   let mut turn_timer = Some(Instant::now());
 
    loop {
-      if is_key_pressed(KEY_NEXT_TURN) {
-         turn_timer = Some(Instant::now());
-      }
-      else if is_key_released(KEY_NEXT_TURN) {
-         turn_timer = None;
+      const KEY_PAUSE : KeyCode = KeyCode::Space;
+      if is_key_pressed(KEY_PAUSE) {
+         turn_timer = match turn_timer {
+            Some(_) => None,
+            None => Some(Instant::now()),
+         };
       }
 
+      const TURN_TIMER_DURATION : Duration = Duration::from_millis(50);
       if let Some(ref mut next_turn_time) = &mut turn_timer {
          if *next_turn_time <= Instant::now() {
             *next_turn_time += TURN_TIMER_DURATION;
