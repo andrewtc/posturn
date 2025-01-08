@@ -1,12 +1,12 @@
 mod game;
 mod snake;
 
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use futures::pin_mut;
 use game::Game;
 use genawaiter::Generator;
-use macroquad::prelude::*;
+use macroquad::{prelude::*, time};
 use miniquad::window::screen_size;
 use snake::{draw_snake, Direction, Segment, Snake};
 
@@ -76,6 +76,14 @@ async fn main() {
          ].into(),
          color: YELLOW,
       },
+      Snake {
+         start: (-3,-3),
+         facing: Direction::North,
+         segments: vec![
+            Segment(Direction::West, 2),
+         ].into(),
+         color: ORANGE,
+      },
    ];
 
    let host = posturn::Host::new(Game {
@@ -89,21 +97,21 @@ async fn main() {
 
    co.as_mut().resume();
 
-   let mut turn_timer = Some(Instant::now());
+   let mut paused = true;
+
+   const TURN_DURATION : Duration = Duration::from_millis(75);
+   let mut turn_time_elapsed = TURN_DURATION;
 
    loop {
       const KEY_PAUSE : KeyCode = KeyCode::Space;
       if is_key_pressed(KEY_PAUSE) {
-         turn_timer = match turn_timer {
-            Some(_) => None,
-            None => Some(Instant::now()),
-         };
+         paused = !paused;
       }
 
-      const TURN_TIMER_DURATION : Duration = Duration::from_millis(75);
-      if let Some(ref mut next_turn_time) = &mut turn_timer {
-         if *next_turn_time <= Instant::now() {
-            *next_turn_time += TURN_TIMER_DURATION;
+      if !paused {
+         turn_time_elapsed += Duration::from_secs_f32(time::get_frame_time());
+         if turn_time_elapsed >= TURN_DURATION {
+            turn_time_elapsed -= TURN_DURATION;
             co.as_mut().resume();
          }
       }
@@ -123,9 +131,10 @@ async fn main() {
       let title_text_pos = (0.5f32 * Vec2::from(screen_size())) - title_text_center;
       draw_text_ex(TITLE_TEXT, title_text_pos.x, title_text_pos.y, title_text_params);
 
+      let turn_progress = turn_time_elapsed.div_duration_f32(TURN_DURATION);
       host.with_game(|game| {
          for snake in &game.snakes {
-            draw_snake(snake);
+            draw_snake(snake, turn_progress);
          }
       });
 

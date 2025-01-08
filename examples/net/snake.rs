@@ -118,14 +118,9 @@ pub fn grid_to_window(tile_pos : (i16, i16)) -> (f32, f32) {
    (screen_half_width + tile_pos.0 as f32 * TILE_SIZE, screen_half_height + tile_pos.1 as f32 * TILE_SIZE)
 }
 
-fn draw_circle_at_tile(tile_pos : (i16, i16), color : Color) {
-   let (draw_x, draw_y) = grid_to_window(tile_pos);
-   draw_circle(draw_x, draw_y, TILE_SIZE / 2 as f32, color);
-}
-
-fn draw_head_at_tile(tile_pos : (i16, i16), direction : Direction, color : Color) {
-   draw_circle_at_tile(tile_pos, color);
-   let (center_x, center_y) = grid_to_window(tile_pos);
+fn draw_head(pos : (f32, f32), direction : Direction, color : Color) {
+   let (center_x, center_y) = pos;
+   draw_circle(center_x, center_y, TILE_SIZE / 2 as f32, color);
 
    const EYE_RADIUS : f32 = TILE_SIZE / 4f32;
    const EYE_SPACING : f32 = EYE_RADIUS * 1.5f32;
@@ -146,26 +141,53 @@ fn draw_head_at_tile(tile_pos : (i16, i16), direction : Direction, color : Color
    draw_circle(center_x - eye_offset_x, center_y - eye_offset_y, PUPIL_RADIUS, PUPIL_COLOR);
 }
 
-fn draw_segment(start : (i16, i16), segment : Segment, color : Color) {
-   let (start_x, start_y) = grid_to_window(start);
-   let (end_x, end_y) = grid_to_window(start + segment);
-   draw_line(start_x, start_y, end_x, end_y, TILE_SIZE as f32, color);
+fn interp(from : f32, to : f32, progress : f32) -> f32 {
+   from + progress * (to - from)
 }
 
-pub fn draw_snake(snake : &Snake) {
-   let (mut tile_x, mut tile_y) = snake.start;
+fn interp_pos(start : (f32, f32), end : (f32, f32), progress : f32) -> (f32, f32) {
+   let (start_x, start_y) = start;
+   let (end_x, end_y) = end;
+   (interp(start_x, end_x, progress), interp(start_y, end_y, progress))
+}
 
+fn draw_segment(start : (f32, f32), end : (f32, f32), color : Color) {
+   let (start_x, start_y) = start;
+   let (end_x, end_y) = end;
+   draw_line(start_x, start_y, end_x, end_y, TILE_SIZE as f32, color);
+   draw_circle(end_x, end_y, TILE_SIZE / 2 as f32, color);
+}
+
+pub fn draw_snake(snake : &Snake, turn_progress : f32) {
+   let (head_x, head_y) = interp_pos(
+      grid_to_window(snake.start + snake.facing.opposite()),
+      grid_to_window(snake.start),
+      turn_progress);
+      
    // Draw the body.
-   for segment in &snake.segments {
-      draw_segment((tile_x, tile_y), *segment, snake.color);
+   let (mut tile_x, mut tile_y) = snake.start;
+   for (index, segment) in snake.segments.iter().enumerate() {
+      let (from_x, from_y) = 
+      if index == 0 {
+         // Connect the first segment to the head
+         (head_x, head_y)
+      }
+      else { grid_to_window((tile_x, tile_y)) };
 
       (tile_x, tile_y) = (tile_x, tile_y) + *segment;
-      draw_circle_at_tile((tile_x, tile_y), snake.color);
+      let (mut to_x, mut to_y) = grid_to_window((tile_x, tile_y));
+
+      if index + 1 == snake.segments.len() {
+         let direction = segment.0;
+         (to_x, to_y) = interp_pos(
+            (to_x, to_y),
+            grid_to_window((tile_x, tile_y) + direction.opposite()),
+            turn_progress);
+      }
+            
+      draw_segment((from_x, from_y), (to_x, to_y), snake.color);
    }
 
-   // Draw the head.
-   let (head_x, head_y) = snake.start;
-   let facing = snake.facing;
-
-   draw_head_at_tile((head_x, head_y), facing, snake.color);
+   // Draw the head on top of the rest of the body.
+   draw_head((head_x, head_y), snake.facing, snake.color);
 }
