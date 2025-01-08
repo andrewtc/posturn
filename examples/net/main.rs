@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use futures::pin_mut;
 use game::Game;
-use genawaiter::Generator;
+use genawaiter::Coroutine;
 use macroquad::{prelude::*, time};
 use miniquad::window::screen_size;
 use snake::{draw_snake, Direction, Segment, Snake};
@@ -90,12 +90,13 @@ async fn main() {
       play_area_half_extents: PLAY_AREA_HALF_EXTENTS,
       random_seed: RANDOM_SEED,
       snakes,
+      player_index: 3,
    });
 
    let co = host.play().unwrap();
    pin_mut!(co);
 
-   co.as_mut().resume();
+   co.as_mut().resume_with(None);
 
    let mut paused = true;
 
@@ -108,11 +109,18 @@ async fn main() {
          paused = !paused;
       }
 
+      let input = 
+         if is_key_down(KeyCode::Left) { Some(Direction::West) }
+         else if is_key_down(KeyCode::Right) { Some(Direction::East) }
+         else if is_key_down(KeyCode::Up) { Some(Direction::North) }
+         else if is_key_down(KeyCode::Down) { Some(Direction::South) }
+         else { None };
+
       if !paused {
          turn_time_elapsed += Duration::from_secs_f32(time::get_frame_time());
          if turn_time_elapsed >= TURN_DURATION {
             turn_time_elapsed -= TURN_DURATION;
-            co.as_mut().resume();
+            co.as_mut().resume_with(input);
          }
       }
 

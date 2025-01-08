@@ -1,7 +1,7 @@
 use macroquad::rand::{srand, RandomRange};
 use posturn::Play;
 
-use crate::snake::Snake;
+use crate::snake::{Direction, Snake};
 
 #[derive(Debug, Clone, Copy)]
 pub struct WaitForInput;
@@ -12,11 +12,12 @@ pub struct Game
    pub play_area_half_extents : (u8, u8),
    pub random_seed : u64,
    pub snakes : Vec<Snake>,
+   pub player_index : usize,
 }
 
 impl Play for Game {
    type Event = WaitForInput;
-   type Input = ();
+   type Input = Option<Direction>;
    type Outcome = ();
 
    fn play(ctx : posturn::Context<Self>) -> impl std::future::Future<Output = Self::Outcome> {
@@ -24,12 +25,14 @@ impl Play for Game {
          srand(ctx.host.borrow_game().random_seed);
 
          loop {
-            let _input = ctx.yield_event(WaitForInput).await;
+            let input = ctx.yield_event(WaitForInput).await;
 
             ctx.host.with_game_mut(|mut game| {
                let (play_area_half_width, play_area_half_height) = game.play_area_half_extents;
+               let player_index = game.player_index;
 
-               for snake in &mut game.snakes {
+               for (index, snake) in &mut game.snakes.iter_mut().enumerate() {
+                  let old_facing = snake.facing;
                   let (next_head_x, next_head_y) = snake.start + snake.facing;
                   let (facing_delta_x, facing_delta_y) = snake.facing.delta();
                   let (cw, ccw) = (snake.facing.cw(), snake.facing.ccw());
@@ -61,7 +64,7 @@ impl Play for Game {
                         snake.facing = cw;
                      }
                   }
-                  else {
+                  else if index != player_index {
                      // Turn randomly to simulate player input.
                      const CHANCE_TO_TURN : f32 = 0.1;
                      if f32::gen_range(0.0, 1.0) <= CHANCE_TO_TURN {
@@ -69,6 +72,15 @@ impl Play for Game {
                            if u8::gen_range(0, 2) == 0 { cw }
                            else { ccw };
                      }
+                  }
+                  else if let Some(direction) = input {
+                     // Allow the player to steer.
+                     snake.facing = direction;
+                  }
+
+                  if snake.facing == old_facing.opposite() {
+                     // Never allow snakes to turn 180 degrees in one turn.
+                     snake.facing = old_facing;
                   }
 
                   snake.step();
