@@ -1,7 +1,7 @@
 use macroquad::rand::{srand, RandomRange};
 use posturn::Play;
 
-use crate::snake::{Direction, Snake};
+use crate::snake::{Direction, Snake, Status};
 
 #[derive(Debug, Clone, Copy)]
 pub struct WaitForInput;
@@ -32,6 +32,10 @@ impl Play for Game {
                let player_index = game.player_index;
 
                for (index, snake) in &mut game.snakes.iter_mut().enumerate() {
+                  if snake.status == Status::Dead {
+                     continue;
+                  }
+
                   let old_facing = snake.facing;
                   let (next_head_x, next_head_y) = snake.start + snake.facing;
                   let (facing_delta_x, facing_delta_y) = snake.facing.delta();

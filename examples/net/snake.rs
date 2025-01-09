@@ -4,6 +4,13 @@ use macroquad::prelude::*;
 
 const TILE_SIZE : f32 = 24f32;
 
+/// The state of a [Snake].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Status {
+   Moving,
+   Dead,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Direction {
    West,
@@ -76,6 +83,7 @@ impl Add<Direction> for (i16, i16) {
 
 #[derive(Debug)]
 pub struct Snake {
+   pub status : Status,
    pub start : (i16, i16),
    pub facing : Direction,
    pub segments : VecDeque<Segment>,
@@ -118,7 +126,7 @@ pub fn grid_to_window(tile_pos : (i16, i16)) -> (f32, f32) {
    (screen_half_width + tile_pos.0 as f32 * TILE_SIZE, screen_half_height + tile_pos.1 as f32 * TILE_SIZE)
 }
 
-fn draw_head(pos : (f32, f32), direction : Direction, color : Color) {
+fn draw_head(pos : (f32, f32), direction : Direction, color : Color, alive : bool) {
    let (center_x, center_y) = pos;
    draw_circle(center_x, center_y, TILE_SIZE / 2 as f32, color);
 
@@ -131,6 +139,8 @@ fn draw_head(pos : (f32, f32), direction : Direction, color : Color) {
       Direction::South => (-EYE_SPACING, 0f32),
    };
 
+   if alive {
+      // Draw the eyes.
       const EYE_COLOR : Color = WHITE;
       draw_circle(center_x + eye_offset_x, center_y + eye_offset_y, EYE_RADIUS, EYE_COLOR);
       draw_circle(center_x - eye_offset_x, center_y - eye_offset_y, EYE_RADIUS, EYE_COLOR);
@@ -139,6 +149,7 @@ fn draw_head(pos : (f32, f32), direction : Direction, color : Color) {
       const PUPIL_COLOR : Color = BLACK;
       draw_circle(center_x + eye_offset_x, center_y + eye_offset_y, PUPIL_RADIUS, PUPIL_COLOR);
       draw_circle(center_x - eye_offset_x, center_y - eye_offset_y, PUPIL_RADIUS, PUPIL_COLOR);
+   }
 }
 
 fn interp(from : f32, to : f32, progress : f32) -> f32 {
@@ -159,10 +170,14 @@ fn draw_segment(start : (f32, f32), end : (f32, f32), color : Color) {
 }
 
 pub fn draw_snake(snake : &Snake, turn_progress : f32) {
-   let (head_x, head_y) = interp_pos(
+   let (mut head_x, mut head_y) = grid_to_window(snake.start);
+   
+   if snake.status == Status::Moving {
+      (head_x, head_y) = interp_pos(
          grid_to_window(snake.start + snake.facing.opposite()),
-      grid_to_window(snake.start),
+         (head_x, head_y),
          turn_progress);
+   }
       
    // Draw the body.
    let (mut tile_x, mut tile_y) = snake.start;
@@ -177,7 +192,7 @@ pub fn draw_snake(snake : &Snake, turn_progress : f32) {
       (tile_x, tile_y) = (tile_x, tile_y) + *segment;
       let (mut to_x, mut to_y) = grid_to_window((tile_x, tile_y));
 
-      if index + 1 == snake.segments.len() {
+      if index + 1 == snake.segments.len() && snake.status == Status::Moving {
          let direction = segment.0;
          (to_x, to_y) = interp_pos(
             (to_x, to_y),
@@ -189,5 +204,6 @@ pub fn draw_snake(snake : &Snake, turn_progress : f32) {
    }
 
    // Draw the head on top of the rest of the body.
-   draw_head((head_x, head_y), snake.facing, snake.color);
+   let alive = snake.status != Status::Dead;
+   draw_head((head_x, head_y), snake.facing, snake.color, alive);
 }

@@ -8,7 +8,7 @@ use game::Game;
 use genawaiter::Coroutine;
 use macroquad::{prelude::*, time};
 use miniquad::window::{screen_size, set_window_size};
-use snake::{draw_snake, Direction, Segment, Snake};
+use snake::{draw_snake, Direction, Segment, Snake, Status};
 
 #[macroquad::main("Out West!")]
 async fn main() {
@@ -21,6 +21,7 @@ async fn main() {
 
    let snakes = vec![
       Snake {
+         status: Status::Dead,
          start: (-19,-13),
          facing: Direction::East,
          segments: vec![
@@ -32,6 +33,7 @@ async fn main() {
          color: GREEN,
       },
       Snake {
+         status: Status::Dead,
          start: (10,-5),
          facing: Direction::East,
          segments: vec![
@@ -43,6 +45,7 @@ async fn main() {
          color: BLUE,
       },
       Snake {
+         status: Status::Dead,
          start: (5,10),
          facing: Direction::North,
          segments: vec![
@@ -58,6 +61,7 @@ async fn main() {
          color: PURPLE,
       },
       Snake {
+         status: Status::Moving,
          start: (-9,-5),
          facing: Direction::West,
          segments: vec![
@@ -73,6 +77,7 @@ async fn main() {
          color: RED,
       },
       Snake {
+         status: Status::Moving,
          start: (20,15),
          facing: Direction::North,
          segments: vec![
@@ -81,6 +86,7 @@ async fn main() {
          color: YELLOW,
       },
       Snake {
+         status: Status::Moving,
          start: (-3,-3),
          facing: Direction::North,
          segments: vec![
