@@ -7,11 +7,15 @@ use futures::pin_mut;
 use game::Game;
 use genawaiter::Coroutine;
 use macroquad::{prelude::*, time};
-use miniquad::window::screen_size;
+use miniquad::window::{screen_size, set_window_size};
 use snake::{draw_snake, Direction, Segment, Snake};
 
 #[macroquad::main("Out West!")]
 async fn main() {
+   const WINDOW_WIDTH : u32 = 1024;
+   const WINDOW_HEIGHT : u32 = 768;
+   set_window_size(WINDOW_WIDTH, WINDOW_HEIGHT);
+
    const PLAY_AREA_HALF_EXTENTS : (u8, u8) = (20, 15);
    const RANDOM_SEED : u64 = 12345;
 

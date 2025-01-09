@@ -2,7 +2,7 @@ use std::{collections::VecDeque, ops::Add};
 
 use macroquad::prelude::*;
 
-const TILE_SIZE : f32 = 16f32;
+const TILE_SIZE : f32 = 24f32;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Direction {
@@ -131,14 +131,14 @@ fn draw_head(pos : (f32, f32), direction : Direction, color : Color) {
       Direction::South => (-EYE_SPACING, 0f32),
    };
 
-   const EYE_COLOR : Color = WHITE;
-   draw_circle(center_x + eye_offset_x, center_y + eye_offset_y, EYE_RADIUS, EYE_COLOR);
-   draw_circle(center_x - eye_offset_x, center_y - eye_offset_y, EYE_RADIUS, EYE_COLOR);
+      const EYE_COLOR : Color = WHITE;
+      draw_circle(center_x + eye_offset_x, center_y + eye_offset_y, EYE_RADIUS, EYE_COLOR);
+      draw_circle(center_x - eye_offset_x, center_y - eye_offset_y, EYE_RADIUS, EYE_COLOR);
 
-   const PUPIL_RADIUS : f32 = EYE_RADIUS / 2f32;
-   const PUPIL_COLOR : Color = BLACK;
-   draw_circle(center_x + eye_offset_x, center_y + eye_offset_y, PUPIL_RADIUS, PUPIL_COLOR);
-   draw_circle(center_x - eye_offset_x, center_y - eye_offset_y, PUPIL_RADIUS, PUPIL_COLOR);
+      const PUPIL_RADIUS : f32 = EYE_RADIUS / 2f32;
+      const PUPIL_COLOR : Color = BLACK;
+      draw_circle(center_x + eye_offset_x, center_y + eye_offset_y, PUPIL_RADIUS, PUPIL_COLOR);
+      draw_circle(center_x - eye_offset_x, center_y - eye_offset_y, PUPIL_RADIUS, PUPIL_COLOR);
 }
 
 fn interp(from : f32, to : f32, progress : f32) -> f32 {
@@ -160,9 +160,9 @@ fn draw_segment(start : (f32, f32), end : (f32, f32), color : Color) {
 
 pub fn draw_snake(snake : &Snake, turn_progress : f32) {
    let (head_x, head_y) = interp_pos(
-      grid_to_window(snake.start + snake.facing.opposite()),
+         grid_to_window(snake.start + snake.facing.opposite()),
       grid_to_window(snake.start),
-      turn_progress);
+         turn_progress);
       
    // Draw the body.
    let (mut tile_x, mut tile_y) = snake.start;
