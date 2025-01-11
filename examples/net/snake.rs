@@ -1,15 +1,8 @@
-use std::{collections::VecDeque, ops::Add};
+use std::{collections::VecDeque, num::{NonZeroU16, NonZeroU8}, ops::Add};
 
 use macroquad::prelude::*;
 
 const TILE_SIZE : f32 = 24f32;
-
-/// The state of a [Snake].
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Status {
-   Moving,
-   Dead,
-}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Direction {
@@ -47,108 +40,160 @@ impl Direction {
       }
    }
 
-   pub const fn delta(&self) -> (i16, i16) {
+   pub const fn delta(&self) -> IVec2 {
       match self {
-         Self::West => (-1, 0),
-         Self::East => (1, 0),
-         Self::North => (0, -1),
-         Self::South => (0, 1),
+         Self::West => ivec2(-1, 0),
+         Self::East => ivec2(1, 0),
+         Self::North => ivec2(0, -1),
+         Self::South => ivec2(0, 1),
       }
    }
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct Segment(pub Direction, pub u8);
+pub struct Segment {
+   pub direction : Direction,
+   pub len : NonZeroU8,
+}
 
-impl Add<Segment> for (i16, i16) {
+impl Segment {
+   pub fn new(direction : Direction, len: u8) -> Self {
+      Self { direction, len: len.try_into().expect("Length cannot be zero") }
+   }
+
+   pub fn with_facing(facing : Direction) -> Self {
+      Self { direction: facing.opposite(), len: NonZeroU8::MIN }
+   }
+
+   pub fn facing(&self) -> Direction {
+      self.direction.opposite()
+   }
+}
+
+impl Add<Segment> for I16Vec2 {
    type Output = Self;
    fn add(self, segment: Segment) -> Self::Output {
-      let (tile_x, tile_y) = self;
-      let Segment(direction, tile_size) = segment;
-      match direction {
-         Direction::West  => (tile_x - tile_size as i16, tile_y),
-         Direction::East  => (tile_x + tile_size as i16, tile_y),
-         Direction::North => (tile_x, tile_y - tile_size as i16),
-         Direction::South => (tile_x, tile_y + tile_size as i16),
+      let I16Vec2 { x, y } = self;
+      let offset = segment.len.get() as i16;
+      match segment.direction {
+         Direction::West  => i16vec2(x - offset, y),
+         Direction::East  => i16vec2(x + offset, y),
+         Direction::North => i16vec2(x, y - offset),
+         Direction::South => i16vec2(x, y + offset),
       }
    }
 }
 
-impl Add<Direction> for (i16, i16) {
+impl Add<Direction> for I16Vec2 {
    type Output = Self;
    fn add(self, direction: Direction) -> Self::Output {
-      self + Segment(direction, 1)
+      self + Segment{ direction, len: NonZeroU8::MIN }
    }
 }
 
 #[derive(Debug)]
-pub struct Snake {
-   pub status : Status,
-   pub start : (i16, i16),
-   pub facing : Direction,
+pub struct SpawnParams {
+   pub alive : bool,
+   pub start : I16Vec2,
    pub segments : VecDeque<Segment>,
    pub color : Color,
 }
 
+#[derive(Debug)]
+pub struct Snake {
+   alive : bool,
+   start : I16Vec2,
+   segments : VecDeque<Segment>,
+   color : Color,
+}
+
 impl Snake {
-   pub fn step(&mut self) {
-      self.start = self.start + self.facing;
-
-      let needs_new_segment =
-         if let Some(&mut Segment(direction, ref mut size)) = self.segments.front_mut() {
-            if direction.opposite() == self.facing {
-               *size += 1;
-               false
-            }
-            else { true }
-         }
-         else { false };
-
-      if needs_new_segment {
-         self.segments.push_front(Segment(self.facing.opposite(), 1));
+   pub fn new(params : SpawnParams) -> Self {
+      assert!(!params.segments.is_empty());
+      Self {
+         alive: params.alive,
+         start: params.start,
+         segments: params.segments,
+         color: params.color,
       }
+   }
 
-      let last_segment_is_empty =
-         if let Some(&mut Segment(_, ref mut size)) = self.segments.back_mut() {
-            *size = size.saturating_sub(1);
-            *size == 0
-         }
-         else { false };
-      
-      if last_segment_is_empty {
+   pub fn grow_forward(&mut self) {
+      // Move the head forward by one tile.
+      self.start = self.start + self.facing();
+      let head = self.segments.front_mut().unwrap();
+      head.len = head.len.saturating_add(1);
+   }
+
+   pub fn grow_cw(&mut self) {
+      let cw = self.facing().cw();
+      self.start = self.start + cw;
+      self.segments.push_front(Segment::with_facing(cw));
+   }
+
+   pub fn grow_ccw(&mut self) {
+      let ccw = self.facing().ccw();
+      self.start = self.start + ccw;
+      self.segments.push_front(Segment::with_facing(ccw));
+   }
+
+   pub fn shrink_tail(&mut self) {
+      let len = self.segments.back().unwrap().len;
+      let new_len = len.get().saturating_sub(1);
+
+      if new_len > 0 {
+         self.segments.back_mut().unwrap().len = new_len.try_into().unwrap();
+      }
+      else {
          self.segments.pop_back();
       }
    }
+
+   pub fn is_alive(&self) -> bool {
+      self.alive
+   }
+
+   pub fn start(&self) -> I16Vec2 {
+      self.start
+   }
+
+   pub fn facing(&self) -> Direction {
+      self.segments.front().unwrap().facing()
+   }
+
+   pub fn len(&self) -> NonZeroU16 {
+      let len : u16 = self.segments.iter().map(|segment| segment.len.get() as u16).sum();
+      len.try_into().unwrap()
+   }
 }
 
-pub fn grid_to_window(tile_pos : (i16, i16)) -> (f32, f32) {
-   let (screen_half_width, screen_half_height) = (0.5 * screen_width(), 0.5 * screen_height());
-   (screen_half_width + tile_pos.0 as f32 * TILE_SIZE, screen_half_height + tile_pos.1 as f32 * TILE_SIZE)
+pub fn grid_to_window(tile_pos : I16Vec2) -> Vec2 {
+   let screen_half_extents = 0.5 * vec2(screen_width(), screen_height());
+   screen_half_extents + tile_pos.as_vec2() * TILE_SIZE
 }
 
-fn draw_head(pos : (f32, f32), direction : Direction, color : Color, alive : bool) {
-   let (center_x, center_y) = pos;
-   draw_circle(center_x, center_y, TILE_SIZE / 2 as f32, color);
+fn draw_head(pos : Vec2, direction : Direction, color : Color, alive : bool) {
+   draw_circle(pos.x, pos.y, TILE_SIZE / 2 as f32, color);
 
    const EYE_RADIUS : f32 = TILE_SIZE / 4f32;
    const EYE_SPACING : f32 = EYE_RADIUS * 1.5f32;
-   let (eye_offset_x, eye_offset_y) = match direction {
-      Direction::West  => (0f32, EYE_SPACING),
-      Direction::East  => (0f32, -EYE_SPACING),
-      Direction::North => (EYE_SPACING, 0f32),
-      Direction::South => (-EYE_SPACING, 0f32),
+   let eye_offset = match direction {
+      Direction::West  => vec2(0f32, EYE_SPACING),
+      Direction::East  => vec2(0f32, -EYE_SPACING),
+      Direction::North => vec2(EYE_SPACING, 0f32),
+      Direction::South => vec2(-EYE_SPACING, 0f32),
    };
 
    if alive {
       // Draw the eyes.
       const EYE_COLOR : Color = WHITE;
-      draw_circle(center_x + eye_offset_x, center_y + eye_offset_y, EYE_RADIUS, EYE_COLOR);
-      draw_circle(center_x - eye_offset_x, center_y - eye_offset_y, EYE_RADIUS, EYE_COLOR);
+      draw_circle(pos.x + eye_offset.x, pos.y + eye_offset.y, EYE_RADIUS, EYE_COLOR);
+      draw_circle(pos.x - eye_offset.x, pos.y - eye_offset.y, EYE_RADIUS, EYE_COLOR);
 
       const PUPIL_RADIUS : f32 = EYE_RADIUS / 2f32;
       const PUPIL_COLOR : Color = BLACK;
-      draw_circle(center_x + eye_offset_x, center_y + eye_offset_y, PUPIL_RADIUS, PUPIL_COLOR);
-      draw_circle(center_x - eye_offset_x, center_y - eye_offset_y, PUPIL_RADIUS, PUPIL_COLOR);
+      draw_circle(pos.x + eye_offset.x, pos.y + eye_offset.y, PUPIL_RADIUS, PUPIL_COLOR);
+      draw_circle(pos.x - eye_offset.x, pos.y - eye_offset.y, PUPIL_RADIUS, PUPIL_COLOR);
    }
 }
 
@@ -156,54 +201,45 @@ fn interp(from : f32, to : f32, progress : f32) -> f32 {
    from + progress * (to - from)
 }
 
-fn interp_pos(start : (f32, f32), end : (f32, f32), progress : f32) -> (f32, f32) {
-   let (start_x, start_y) = start;
-   let (end_x, end_y) = end;
-   (interp(start_x, end_x, progress), interp(start_y, end_y, progress))
+fn interp_pos(start : Vec2, end : Vec2, progress : f32) -> Vec2 {
+   vec2(interp(start.x, end.x, progress), interp(start.y, end.y, progress))
 }
 
-fn draw_segment(start : (f32, f32), end : (f32, f32), color : Color) {
-   let (start_x, start_y) = start;
-   let (end_x, end_y) = end;
-   draw_line(start_x, start_y, end_x, end_y, TILE_SIZE as f32, color);
-   draw_circle(end_x, end_y, TILE_SIZE / 2 as f32, color);
+fn draw_segment(start : Vec2, end : Vec2, color : Color) {
+   draw_line(start.x, start.y, end.x, end.y, TILE_SIZE as f32, color);
+   draw_circle(end.x, end.y, TILE_SIZE / 2 as f32, color);
 }
 
 pub fn draw_snake(snake : &Snake, turn_progress : f32) {
-   let (mut head_x, mut head_y) = grid_to_window(snake.start);
-   
-   if snake.status == Status::Moving {
-      (head_x, head_y) = interp_pos(
-         grid_to_window(snake.start + snake.facing.opposite()),
-         (head_x, head_y),
-         turn_progress);
-   }
-      
    // Draw the body.
-   let (mut tile_x, mut tile_y) = snake.start;
+   let mut start = snake.start();
+   let mut head_pos = grid_to_window(start);
+
    for (index, segment) in snake.segments.iter().enumerate() {
-      let (from_x, from_y) = 
-      if index == 0 {
-         // Connect the first segment to the head
-         (head_x, head_y)
-      }
-      else { grid_to_window((tile_x, tile_y)) };
+      let mut from = grid_to_window(start);
+      
+      if index == 0 && snake.alive {
+         from = interp_pos(
+            grid_to_window(snake.start + segment.direction),
+            from,
+            turn_progress);
 
-      (tile_x, tile_y) = (tile_x, tile_y) + *segment;
-      let (mut to_x, mut to_y) = grid_to_window((tile_x, tile_y));
+         head_pos = from;
+      };
 
-      if index + 1 == snake.segments.len() && snake.status == Status::Moving {
-         let direction = segment.0;
-         (to_x, to_y) = interp_pos(
-            (to_x, to_y),
-            grid_to_window((tile_x, tile_y) + direction.opposite()),
+      start = start + *segment;
+      let mut to = grid_to_window(start);
+
+      if index + 1 == snake.segments.len() && snake.alive {
+         to = interp_pos(
+            to,
+            grid_to_window(start + segment.facing()),
             turn_progress);
       }
             
-      draw_segment((from_x, from_y), (to_x, to_y), snake.color);
+      draw_segment(from, to, snake.color);
    }
 
    // Draw the head on top of the rest of the body.
-   let alive = snake.status != Status::Dead;
-   draw_head((head_x, head_y), snake.facing, snake.color, alive);
+   draw_head(head_pos, snake.facing(), snake.color, snake.alive);
 }

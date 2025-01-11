@@ -8,7 +8,7 @@ use game::Game;
 use genawaiter::Coroutine;
 use macroquad::{prelude::*, time};
 use miniquad::window::{screen_size, set_window_size};
-use snake::{draw_snake, Direction, Segment, Snake, Status};
+use snake::{draw_snake, Direction, Segment, Snake, SpawnParams};
 
 #[macroquad::main("Out West!")]
 async fn main() {
@@ -16,84 +16,78 @@ async fn main() {
    const WINDOW_HEIGHT : u32 = 768;
    set_window_size(WINDOW_WIDTH, WINDOW_HEIGHT);
 
-   const PLAY_AREA_HALF_EXTENTS : (u8, u8) = (20, 15);
+   const PLAY_AREA_HALF_EXTENTS : U16Vec2 = u16vec2(20, 15);
    const RANDOM_SEED : u64 = 12345;
 
    let snakes = vec![
-      Snake {
-         status: Status::Dead,
-         start: (-19,-13),
-         facing: Direction::East,
+      Snake::new(SpawnParams {
+         alive: false,
+         start: i16vec2(-19, -13),
          segments: vec![
-            Segment(Direction::South, 3),
-            Segment(Direction::East, 8),
-            Segment(Direction::North, 2),
-            Segment(Direction::West, 2),
+            Segment::new(Direction::South, 3),
+            Segment::new(Direction::East,  8),
+            Segment::new(Direction::North, 2),
+            Segment::new(Direction::West,  2),
          ].into(),
          color: GREEN,
-      },
-      Snake {
-         status: Status::Dead,
-         start: (10,-5),
-         facing: Direction::East,
+      }),
+      Snake::new(SpawnParams {
+         alive: false,
+         start: i16vec2(10, -5),
          segments: vec![
-            Segment(Direction::North, 5),
-            Segment(Direction::West, 3),
-            Segment(Direction::South, 4),
-            Segment(Direction::East, 1),
+            Segment::new(Direction::North, 5),
+            Segment::new(Direction::West,  3),
+            Segment::new(Direction::South, 4),
+            Segment::new(Direction::East,  1),
          ].into(),
          color: BLUE,
-      },
-      Snake {
-         status: Status::Dead,
-         start: (5,10),
-         facing: Direction::North,
+      }),
+      Snake::new(SpawnParams {
+         alive: false,
+         start: i16vec2(5, 10),
          segments: vec![
-            Segment(Direction::South, 2),
-            Segment(Direction::East, 2),
-            Segment(Direction::North, 2),
-            Segment(Direction::East, 2),
-            Segment(Direction::South, 2),
-            Segment(Direction::East, 2),
-            Segment(Direction::North, 2),
-            Segment(Direction::East, 2),
+            Segment::new(Direction::South, 2),
+            Segment::new(Direction::East,  2),
+            Segment::new(Direction::North, 2),
+            Segment::new(Direction::East,  2),
+            Segment::new(Direction::South, 2),
+            Segment::new(Direction::East,  2),
+            Segment::new(Direction::North, 2),
+            Segment::new(Direction::East,  2),
          ].into(),
          color: PURPLE,
-      },
-      Snake {
-         status: Status::Moving,
-         start: (-9,-5),
-         facing: Direction::West,
+      }),
+      Snake::new(SpawnParams {
+         alive: true,
+         start: i16vec2(-9, -5),
          segments: vec![
-            Segment(Direction::North, 2),
-            Segment(Direction::East, 2),
-            Segment(Direction::North, 2),
-            Segment(Direction::West, 2),
-            Segment(Direction::North, 2),
-            Segment(Direction::East, 2),
-            Segment(Direction::North, 2),
-            Segment(Direction::West, 2),
+            Segment::new(Direction::North, 2),
+            Segment::new(Direction::East,  2),
+            Segment::new(Direction::North, 2),
+            Segment::new(Direction::West,  2),
+            Segment::new(Direction::North, 2),
+            Segment::new(Direction::East,  2),
+            Segment::new(Direction::North, 2),
+            Segment::new(Direction::West,  2),
          ].into(),
          color: RED,
-      },
-      Snake {
-         status: Status::Moving,
-         start: (20,15),
-         facing: Direction::North,
+      }),
+      Snake::new(SpawnParams {
+         alive: true,
+         start: i16vec2(20, 15),
          segments: vec![
-            Segment(Direction::West, 8),
+            Segment::new(Direction::West, 8),
          ].into(),
          color: YELLOW,
-      },
-      Snake {
-         status: Status::Moving,
-         start: (-3,-3),
-         facing: Direction::North,
+      }),
+      Snake::new(SpawnParams {
+         alive: true,
+         start: i16vec2(-3, -3),
          segments: vec![
-            Segment(Direction::West, 2),
+            Segment::new(Direction::West, 2),
          ].into(),
          color: ORANGE,
-      },
+      }),
    ];
 
    let host = posturn::Host::new(Game {
@@ -111,7 +105,7 @@ async fn main() {
    let mut paused = true;
 
    const TURN_DURATION : Duration = Duration::from_millis(75);
-   let mut turn_time_elapsed = TURN_DURATION;
+   let mut turn_time_elapsed = Duration::ZERO;
 
    loop {
       const KEY_PAUSE : KeyCode = KeyCode::Space;
