@@ -1,3 +1,4 @@
+mod draw;
 mod game;
 mod snake;
 
@@ -8,7 +9,7 @@ use game::Game;
 use genawaiter::Coroutine;
 use macroquad::{prelude::*, time};
 use miniquad::window::{screen_size, set_window_size};
-use snake::{draw_snake, Direction, Segment, Snake, SpawnParams};
+use snake::{Direction, Segment, Snake, SpawnParams};
 
 #[macroquad::main("Out West!")]
 async fn main() {
@@ -146,7 +147,7 @@ async fn main() {
       let turn_progress = turn_time_elapsed.div_duration_f32(TURN_DURATION);
       host.with_game(|game| {
          for snake in &game.snakes {
-            draw_snake(snake, turn_progress);
+            draw::draw_snake(snake, turn_progress);
          }
       });
 

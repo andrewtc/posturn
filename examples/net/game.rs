@@ -32,7 +32,7 @@ impl Play for Game {
                let player_index = game.player_index;
 
                for (index, snake) in &mut game.snakes.iter_mut().enumerate() {
-                  if !snake.is_alive() {
+                  if !snake.alive {
                      continue;
                   }
 

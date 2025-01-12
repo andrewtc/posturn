@@ -1,8 +1,5 @@
-use std::{collections::VecDeque, num::{NonZeroU16, NonZeroU8}, ops::Add};
-
+use std::{collections::{vec_deque, VecDeque}, num::{NonZeroU16, NonZeroU8}, ops::{Add, RangeInclusive}};
 use macroquad::prelude::*;
-
-const TILE_SIZE : f32 = 24f32;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Direction {
@@ -101,10 +98,10 @@ pub struct SpawnParams {
 
 #[derive(Debug)]
 pub struct Snake {
-   alive : bool,
+   pub alive : bool,
    start : I16Vec2,
    segments : VecDeque<Segment>,
-   color : Color,
+   pub color : Color,
 }
 
 impl Snake {
@@ -149,12 +146,16 @@ impl Snake {
       }
    }
 
-   pub fn is_alive(&self) -> bool {
-      self.alive
-   }
-
    pub fn start(&self) -> I16Vec2 {
       self.start
+   }
+
+   pub fn segments(&self) -> Segments<'_> {
+      Segments { next_start: self.start, inner: self.segments.iter() }
+   }
+
+   pub fn num_segments(&self) -> usize {
+      self.segments.len()
    }
 
    pub fn facing(&self) -> Direction {
@@ -167,79 +168,28 @@ impl Snake {
    }
 }
 
-pub fn grid_to_window(tile_pos : I16Vec2) -> Vec2 {
-   let screen_half_extents = 0.5 * vec2(screen_width(), screen_height());
-   screen_half_extents + tile_pos.as_vec2() * TILE_SIZE
+/// An iterator over the [`Segment`s](Segment) of a [`Snake`]. Also outputs the start and end location of the `Segment`
+/// as a [`RangeInclusive`] of [`I16Vec2`].
+pub struct Segments<'iter> {
+   next_start : I16Vec2,
+   inner : vec_deque::Iter<'iter, Segment>,
 }
 
-fn draw_head(pos : Vec2, direction : Direction, color : Color, alive : bool) {
-   draw_circle(pos.x, pos.y, TILE_SIZE / 2 as f32, color);
+impl<'iter> ExactSizeIterator for Segments<'iter> { }
 
-   const EYE_RADIUS : f32 = TILE_SIZE / 4f32;
-   const EYE_SPACING : f32 = EYE_RADIUS * 1.5f32;
-   let eye_offset = match direction {
-      Direction::West  => vec2(0f32, EYE_SPACING),
-      Direction::East  => vec2(0f32, -EYE_SPACING),
-      Direction::North => vec2(EYE_SPACING, 0f32),
-      Direction::South => vec2(-EYE_SPACING, 0f32),
-   };
+impl<'iter> Iterator for Segments<'iter> {
+   type Item = (RangeInclusive<I16Vec2>, Segment);
 
-   if alive {
-      // Draw the eyes.
-      const EYE_COLOR : Color = WHITE;
-      draw_circle(pos.x + eye_offset.x, pos.y + eye_offset.y, EYE_RADIUS, EYE_COLOR);
-      draw_circle(pos.x - eye_offset.x, pos.y - eye_offset.y, EYE_RADIUS, EYE_COLOR);
-
-      const PUPIL_RADIUS : f32 = EYE_RADIUS / 2f32;
-      const PUPIL_COLOR : Color = BLACK;
-      draw_circle(pos.x + eye_offset.x, pos.y + eye_offset.y, PUPIL_RADIUS, PUPIL_COLOR);
-      draw_circle(pos.x - eye_offset.x, pos.y - eye_offset.y, PUPIL_RADIUS, PUPIL_COLOR);
-   }
-}
-
-fn interp(from : f32, to : f32, progress : f32) -> f32 {
-   from + progress * (to - from)
-}
-
-fn interp_pos(start : Vec2, end : Vec2, progress : f32) -> Vec2 {
-   vec2(interp(start.x, end.x, progress), interp(start.y, end.y, progress))
-}
-
-fn draw_segment(start : Vec2, end : Vec2, color : Color) {
-   draw_line(start.x, start.y, end.x, end.y, TILE_SIZE as f32, color);
-   draw_circle(end.x, end.y, TILE_SIZE / 2 as f32, color);
-}
-
-pub fn draw_snake(snake : &Snake, turn_progress : f32) {
-   // Draw the body.
-   let mut start = snake.start();
-   let mut head_pos = grid_to_window(start);
-
-   for (index, segment) in snake.segments.iter().enumerate() {
-      let mut from = grid_to_window(start);
-      
-      if index == 0 && snake.alive {
-         from = interp_pos(
-            grid_to_window(snake.start + segment.direction),
-            from,
-            turn_progress);
-
-         head_pos = from;
-      };
-
-      start = start + *segment;
-      let mut to = grid_to_window(start);
-
-      if index + 1 == snake.segments.len() && snake.alive {
-         to = interp_pos(
-            to,
-            grid_to_window(start + segment.facing()),
-            turn_progress);
-      }
-            
-      draw_segment(from, to, snake.color);
+   fn size_hint(&self) -> (usize, Option<usize>) {
+      self.inner.size_hint()
    }
 
-   // Draw the head on top of the rest of the body.
-   draw_head(head_pos, snake.facing(), snake.color, snake.alive);
+   fn next(&mut self) -> Option<Self::Item> {
+      self.inner.next().map(|segment| {
+         let start = self.next_start;
+         let end = start + *segment;
+         self.next_start = end;
+         (RangeInclusive::new(start, end), *segment)
+      })
+   }
 }
