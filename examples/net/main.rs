@@ -132,24 +132,37 @@ async fn main() {
       const BG_COLOR : Color = Color::new(0.73, 0.4, 0.17, 1f32);
       clear_background(BG_COLOR);
 
-      const TITLE_TEXT : &str = "Out West!";
-      let title_text_params = TextParams {
-         font: None,
-         font_size: 128,
-         color: WHITE,
-         ..Default::default()
-      };
-
-      let title_text_center = get_text_center(TITLE_TEXT, None, title_text_params.font_size, title_text_params.font_scale, title_text_params.rotation);
-      let title_text_pos = (0.5f32 * Vec2::from(screen_size())) - title_text_center;
-      draw_text_ex(TITLE_TEXT, title_text_pos.x, title_text_pos.y, title_text_params);
-
       let turn_progress = turn_time_elapsed.div_duration_f32(TURN_DURATION);
       host.with_game(|game| {
          for snake in &game.snakes {
             draw::draw_snake(snake, turn_progress);
          }
       });
+
+      if paused {
+         const TITLE_TEXT : &str = "Out West!";
+         let title_text_params = TextParams {
+            font: None,
+            font_size: 128,
+            color: WHITE,
+            ..Default::default()
+         };
+         
+         const PAUSED_TEXT : &str = "Press SPACE to pause or resume the game.";
+         let paused_text_params = TextParams {
+            font_size: 32,
+            ..title_text_params
+         };
+
+         let screen_center = 0.5f32 * Vec2::from(screen_size());
+         let title_text_center = get_text_center(TITLE_TEXT, None, title_text_params.font_size, title_text_params.font_scale, title_text_params.rotation);
+         let title_text_pos = screen_center - title_text_center;
+         draw_text_ex(TITLE_TEXT, title_text_pos.x, title_text_pos.y, title_text_params);
+
+         let paused_text_center = get_text_center(PAUSED_TEXT, None, paused_text_params.font_size, paused_text_params.font_scale, paused_text_params.rotation);
+         let paused_text_pos = (screen_center + Vec2{ x: 0.0, y: 64.0 }) - paused_text_center;
+         draw_text_ex(PAUSED_TEXT, paused_text_pos.x, paused_text_pos.y, paused_text_params);
+      }
 
       next_frame().await;
    }
