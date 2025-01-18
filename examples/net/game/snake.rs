@@ -142,6 +142,25 @@ impl Snake {
       self.segments.push_front(Segment::with_facing(ccw));
    }
 
+   pub fn shrink_head(&mut self) {
+      let head_segment = self.segments.front().unwrap();
+      let new_len = head_segment.len.get().saturating_sub(1);
+
+      let direction =
+         if new_len == 0 {
+            let segment = self.segments.pop_front().unwrap();
+            segment.direction
+         }
+         else {
+            let segment = self.segments.front_mut().unwrap();
+            segment.len = new_len.try_into().unwrap();
+            segment.direction
+         };
+
+      self.start = self.start + direction;
+      assert!(!self.segments.is_empty());
+   }
+
    pub fn shrink_tail(&mut self) {
       let len = self.segments.back().unwrap().len;
       let new_len = len.get().saturating_sub(1);
@@ -161,23 +180,8 @@ impl Snake {
          return;
       }
 
-      let new_len = self.segments.front().unwrap().len.get().saturating_sub(1);
-
-      let direction =
-         if new_len == 0 {
-            let segment = self.segments.pop_front().unwrap();
-            segment.direction
-         }
-         else {
-            let segment = self.segments.front_mut().unwrap();
-            segment.len = new_len.try_into().unwrap();
-            segment.direction
-         };
-
-      self.start = self.start + direction;
+      self.shrink_head();
       self.alive = false;
-      
-      assert!(!self.segments.is_empty());
    }
 
    pub fn overlaps(&self, tile : I16Vec2) -> Overlaps<'_> {
