@@ -21,9 +21,13 @@ impl Game {
    fn handle_collisions(&mut self) {
       let snakes = self.snakes.clone();
       for (index, snake) in snakes.iter().enumerate() {
+         if !snake.alive {
+            continue;
+         }
+
          for (other_index, other_snake) in self.snakes.iter_mut().enumerate() {
             if (index == other_index && snake.is_overlapping_self()) ||
-               (index != other_index && other_snake.alive && snake.is_overlapping(other_snake.start()))
+               (index != other_index && other_snake.alive && snake.start() == other_snake.start() && other_snake.len() <= snake.len())
             {
                other_snake.decap();
                break;
