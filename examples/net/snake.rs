@@ -45,6 +45,14 @@ impl Direction {
          Self::South => ivec2(0, 1),
       }
    }
+
+   pub const fn is_horizontal(&self) -> bool {
+      self.delta().y == 0
+   }
+
+   pub const fn is_vertical(&self) -> bool {
+      self.delta().x == 0
+   }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -144,6 +152,30 @@ impl Snake {
       else {
          self.segments.pop_back();
       }
+   }
+
+   pub fn is_touching(&self, tile : I16Vec2) -> bool {
+      let mut is_touching = false;
+      for (tiles, segment) in self.segments() {
+         let start = tiles.start();
+         let end = tiles.end();
+
+         if segment.direction.is_horizontal() && tile.y == start.y {
+            let range_x = start.x.min(end.x) ..= start.x.max(end.x);
+            if range_x.contains(&tile.x) {
+               is_touching = true;
+               break;
+            }
+         }
+         else if segment.direction.is_vertical() && tile.x == start.x {
+            let range_y = start.y.min(end.y) ..= start.y.max(end.y);
+            if range_y.contains(&tile.y) {
+               is_touching = true;
+               break;
+            }
+         }
+      }
+      is_touching
    }
 
    pub fn start(&self) -> I16Vec2 {

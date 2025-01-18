@@ -47,10 +47,11 @@ pub fn draw_segment(start : Vec2, end : Vec2, color : Color) {
    draw_circle(end.x, end.y, TILE_SIZE / 2 as f32, color);
 }
 
-pub fn draw_snake(snake : &Snake, turn_progress : f32) {
+pub fn draw_snake(snake : &Snake, turn_progress : f32, color_override : Option<Color>) {
    // Draw the body.
    let mut head_pos = grid_to_window(snake.start());
    let num_segments = snake.num_segments();
+   let color = color_override.unwrap_or(snake.color);
 
    for (index, (tiles, segment)) in snake.segments().enumerate() {
       let mut from = grid_to_window(*tiles.start());
@@ -75,9 +76,9 @@ pub fn draw_snake(snake : &Snake, turn_progress : f32) {
             turn_progress);
       }
             
-      draw_segment(from, to, snake.color);
+      draw_segment(from, to, color);
    }
 
    // Draw the head on top of the rest of the body.
-   draw_head(head_pos, snake.facing(), snake.color, snake.alive);
+   draw_head(head_pos, snake.facing(), color, snake.alive);
 }
