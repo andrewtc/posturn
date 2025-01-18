@@ -1,7 +1,9 @@
+pub mod snake;
+
 use macroquad::{math::{I16Vec2, U16Vec2}, rand::{srand, RandomRange}};
 use posturn::Play;
 
-use crate::snake::{Direction, Snake};
+use snake::{Direction, Snake};
 
 #[derive(Debug, Clone, Copy)]
 pub struct WaitForInput;
