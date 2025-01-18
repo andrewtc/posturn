@@ -202,6 +202,7 @@ impl Snake {
 
 /// An iterator over the [`Segment`s](Segment) of a [`Snake`]. Also outputs the start and end location of the `Segment`
 /// as a [`RangeInclusive`] of [`I16Vec2`].
+#[derive(Debug)]
 pub struct Segments<'iter> {
    next_start : I16Vec2,
    inner : vec_deque::Iter<'iter, Segment>,
