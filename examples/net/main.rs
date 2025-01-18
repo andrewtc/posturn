@@ -20,7 +20,7 @@ async fn main() {
 
    let snakes = vec![
       Snake::new(SpawnParams {
-         alive: false,
+         alive: true,
          start: i16vec2(-19, -13),
          segments: vec![
             Segment::new(Direction::South, 3),
@@ -31,7 +31,7 @@ async fn main() {
          color: GREEN,
       }),
       Snake::new(SpawnParams {
-         alive: false,
+         alive: true,
          start: i16vec2(10, -5),
          segments: vec![
             Segment::new(Direction::North, 5),
@@ -42,7 +42,7 @@ async fn main() {
          color: BLUE,
       }),
       Snake::new(SpawnParams {
-         alive: false,
+         alive: true,
          start: i16vec2(5, 10),
          segments: vec![
             Segment::new(Direction::South, 2),
@@ -132,21 +132,8 @@ async fn main() {
 
       let turn_progress = turn_time_elapsed.div_duration_f32(TURN_DURATION);
       host.with_game(|game| {
-         for (index, snake) in game.snakes.iter().enumerate() {
-            let mut is_touching = false;
-
-            for (other_index, other_snake) in game.snakes.iter().enumerate() {
-               if (index == other_index && snake.is_overlapping_self()) ||
-                  (index != other_index && other_snake.alive && snake.is_overlapping(other_snake.start()))
-               {
-                  is_touching = true;
-                  break;
-               }
-            }
-            
-            const COLLISION_COLOR : Color = WHITE;
-            let color_override = if is_touching { Some(COLLISION_COLOR) } else { None };
-            draw::draw_snake(snake, turn_progress, color_override);
+         for snake in game.snakes.iter() {
+            draw::draw_snake(snake, turn_progress, None);
          }
       });
 

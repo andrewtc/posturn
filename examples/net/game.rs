@@ -17,6 +17,22 @@ pub struct Game
    pub player_index : usize,
 }
 
+impl Game {
+   fn handle_collisions(&mut self) {
+      let snakes = self.snakes.clone();
+      for (index, snake) in snakes.iter().enumerate() {
+         for (other_index, other_snake) in self.snakes.iter_mut().enumerate() {
+            if (index == other_index && snake.is_overlapping_self()) ||
+               (index != other_index && other_snake.alive && snake.is_overlapping(other_snake.start()))
+            {
+               other_snake.decap();
+               break;
+            }
+         }
+      }
+   }
+}
+
 impl Play for Game {
    type Event = WaitForInput;
    type Input = Option<Direction>;
@@ -99,6 +115,8 @@ impl Play for Game {
 
                   assert_eq!(snake.len(), old_len, "The snake should always stay the same length");
                }
+
+               game.handle_collisions();
             });
          }
       }

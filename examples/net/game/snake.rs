@@ -104,7 +104,7 @@ pub struct SpawnParams {
    pub color : Color,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Snake {
    pub alive : bool,
    start : I16Vec2,
@@ -152,6 +152,32 @@ impl Snake {
       else {
          self.segments.pop_back();
       }
+
+      assert!(!self.segments.is_empty());
+   }
+
+   pub fn decap(&mut self) {
+      if !self.alive {
+         return;
+      }
+
+      let new_len = self.segments.front().unwrap().len.get().saturating_sub(1);
+
+      let direction =
+         if new_len == 0 {
+            let segment = self.segments.pop_front().unwrap();
+            segment.direction
+         }
+         else {
+            let segment = self.segments.front_mut().unwrap();
+            segment.len = new_len.try_into().unwrap();
+            segment.direction
+         };
+
+      self.start = self.start + direction;
+      self.alive = false;
+      
+      assert!(!self.segments.is_empty());
    }
 
    pub fn overlaps(&self, tile : I16Vec2) -> Overlaps<'_> {
