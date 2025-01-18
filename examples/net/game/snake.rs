@@ -211,7 +211,7 @@ pub struct Segments<'iter> {
 impl<'iter> ExactSizeIterator for Segments<'iter> { }
 
 impl<'iter> Iterator for Segments<'iter> {
-   type Item = (RangeInclusive<I16Vec2>, Segment);
+   type Item = (RangeInclusive<I16Vec2>, &'iter Segment);
 
    fn size_hint(&self) -> (usize, Option<usize>) {
       self.inner.size_hint()
@@ -222,7 +222,7 @@ impl<'iter> Iterator for Segments<'iter> {
          let start = self.next_start;
          let end = start + *segment;
          self.next_start = end;
-         (RangeInclusive::new(start, end), *segment)
+         (RangeInclusive::new(start, end), segment)
       })
    }
 }
