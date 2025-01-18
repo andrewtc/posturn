@@ -1,4 +1,4 @@
-use std::{collections::{vec_deque, VecDeque}, num::{NonZeroU16, NonZeroU8}, ops::{Add, RangeInclusive}};
+use std::{collections::{vec_deque, VecDeque}, iter::Enumerate, num::{NonZeroU16, NonZeroU8}, ops::{Add, RangeInclusive}};
 use macroquad::prelude::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -154,28 +154,17 @@ impl Snake {
       }
    }
 
-   pub fn is_touching(&self, tile : I16Vec2) -> bool {
-      let mut is_touching = false;
-      for (tiles, segment) in self.segments() {
-         let start = tiles.start();
-         let end = tiles.end();
+   pub fn overlaps(&self, tile : I16Vec2) -> Overlaps<'_> {
+      Overlaps { tile, inner: self.segments().enumerate() }
+   }
 
-         if segment.direction.is_horizontal() && tile.y == start.y {
-            let range_x = start.x.min(end.x) ..= start.x.max(end.x);
-            if range_x.contains(&tile.x) {
-               is_touching = true;
-               break;
-            }
-         }
-         else if segment.direction.is_vertical() && tile.x == start.x {
-            let range_y = start.y.min(end.y) ..= start.y.max(end.y);
-            if range_y.contains(&tile.y) {
-               is_touching = true;
-               break;
-            }
-         }
-      }
-      is_touching
+   pub fn is_overlapping(&self, tile : I16Vec2) -> bool {
+      self.overlaps(tile).next().is_some()
+   }
+
+   pub fn is_overlapping_self(&self) -> bool {
+      // Snakes only overlap with themselves if the head touches a body segment.
+      self.overlaps(self.start).any(|(index, _)| index > 0)
    }
 
    pub fn start(&self) -> I16Vec2 {
@@ -224,5 +213,40 @@ impl<'iter> Iterator for Segments<'iter> {
          self.next_start = end;
          (RangeInclusive::new(start, end), segment)
       })
+   }
+}
+
+#[derive(Debug)]
+pub struct Overlaps<'iter> {
+   tile : I16Vec2,
+   inner : Enumerate<Segments<'iter>>,
+}
+
+impl<'iter> Iterator for Overlaps<'iter> {
+   type Item = (usize, &'iter Segment);
+
+   fn size_hint(&self) -> (usize, Option<usize>) {
+      self.inner.size_hint()
+   }
+
+   fn next(&mut self) -> Option<Self::Item> {
+      loop {
+         let (index, (tiles, segment)) = self.inner.next()?;
+         let start = tiles.start();
+         let end = tiles.end();
+
+         if segment.direction.is_horizontal() && self.tile.y == start.y {
+            let range_x = start.x.min(end.x) ..= start.x.max(end.x);
+            if range_x.contains(&self.tile.x) {
+               break Some((index, segment));
+            }
+         }
+         else if segment.direction.is_vertical() && self.tile.x == start.x {
+            let range_y = start.y.min(end.y) ..= start.y.max(end.y);
+            if range_y.contains(&self.tile.y) {
+               break Some((index, segment));
+            }
+         }
+      }
    }
 }

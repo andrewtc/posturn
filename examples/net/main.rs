@@ -136,16 +136,14 @@ async fn main() {
             let mut is_touching = false;
 
             for (other_index, other_snake) in game.snakes.iter().enumerate() {
-               if index == other_index {
-                  continue;
-               }
-
-               if other_snake.alive && snake.is_touching(other_snake.start()) {
+               if (index == other_index && snake.is_overlapping_self()) ||
+                  (index != other_index && other_snake.alive && snake.is_overlapping(other_snake.start()))
+               {
                   is_touching = true;
                   break;
                }
             }
-
+            
             const COLLISION_COLOR : Color = WHITE;
             let color_override = if is_touching { Some(COLLISION_COLOR) } else { None };
             draw::draw_snake(snake, turn_progress, color_override);
