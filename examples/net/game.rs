@@ -1,5 +1,7 @@
 pub mod snake;
 
+use std::{mem::swap, num::NonZeroU16};
+
 use macroquad::{math::{I16Vec2, U16Vec2}, rand::{srand, RandomRange}};
 use posturn::Play;
 
@@ -19,19 +21,36 @@ pub struct Game
 
 impl Game {
    fn handle_collisions(&mut self) {
-      let snakes = self.snakes.clone();
-      for (index, snake) in snakes.iter().enumerate() {
-         if !snake.alive {
-            continue;
+      let mut old_snakes = vec![];
+      swap(&mut old_snakes, &mut self.snakes);
+
+      for (snake_index, snake) in old_snakes.iter().enumerate() {
+         let mut overlapped = false;
+
+         if snake.alive {
+            for (overlapping_index, overlapping_snake) in old_snakes.iter().enumerate() {
+               if (snake_index == overlapping_index && snake.is_overlapping_self()) ||
+                  (snake_index != overlapping_index && snake.start() == overlapping_snake.start() && overlapping_snake.can_decap(&snake))
+               {
+                  overlapped = true;
+                  if snake.len() == NonZeroU16::MIN {
+                     // If the Snake is just a head, we simply don't add it back into the game.
+                     break;
+                  }
+                  else {
+                     // Otherwise, add just the tail.
+                     let mut snake_minus_head = snake.clone();
+                     snake_minus_head.decap();
+                     self.snakes.push(snake_minus_head);
+                     break;
+                  }
+               }
+            }
          }
 
-         for (other_index, other_snake) in self.snakes.iter_mut().enumerate() {
-            if (index == other_index && snake.is_overlapping_self()) ||
-               (index != other_index && snake.start() == other_snake.start() && snake.can_decap(&other_snake))
-            {
-               other_snake.decap();
-               break;
-            }
+         if !overlapped {
+            // If we get here, no overlaps occurred. Simply add the Snake back into the game.
+            self.snakes.push(snake.clone());
          }
       }
    }

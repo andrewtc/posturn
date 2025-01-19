@@ -83,7 +83,7 @@ async fn main() {
          alive: true,
          start: i16vec2(-3, -3),
          segments: vec![
-            Segment::new(Direction::West, 2),
+            Segment::new(Direction::West, 1),
          ].into(),
          color: ORANGE,
       }),
