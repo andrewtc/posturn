@@ -27,7 +27,7 @@ impl Game {
 
          for (other_index, other_snake) in self.snakes.iter_mut().enumerate() {
             if (index == other_index && snake.is_overlapping_self()) ||
-               (index != other_index && other_snake.alive && snake.start() == other_snake.start() && other_snake.len() <= snake.len())
+               (index != other_index && snake.start() == other_snake.start() && snake.can_decap(&other_snake))
             {
                other_snake.decap();
                break;

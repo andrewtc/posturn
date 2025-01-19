@@ -175,6 +175,11 @@ impl Snake {
       assert!(!self.segments.is_empty());
    }
 
+   pub fn can_decap(&self, other : &Snake) -> bool {
+      // Both Snakes must be alive and this Snake must be longer.
+      self.alive && other.alive && other.len() <= self.len()
+   }
+
    pub fn decap(&mut self) {
       if !self.alive {
          return;
