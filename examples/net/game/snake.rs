@@ -143,6 +143,9 @@ impl Snake {
    }
 
    pub fn shrink_head(&mut self) {
+      // If it had a head, now it doesn't.
+      self.alive = false;
+
       let head_segment = self.segments.front().unwrap();
       let new_len = head_segment.len.get().saturating_sub(1);
 
@@ -178,15 +181,6 @@ impl Snake {
    pub fn can_decap(&self, other : &Snake) -> bool {
       // Both Snakes must be alive and this Snake must be longer.
       self.alive && other.alive && other.len() <= self.len()
-   }
-
-   pub fn decap(&mut self) {
-      if !self.alive {
-         return;
-      }
-
-      self.shrink_head();
-      self.alive = false;
    }
 
    pub fn overlaps(&self, tile : I16Vec2) -> Overlaps<'_> {

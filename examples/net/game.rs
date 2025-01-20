@@ -40,7 +40,7 @@ impl Game {
                   else {
                      // Otherwise, add just the tail.
                      let mut snake_minus_head = snake.clone();
-                     snake_minus_head.decap();
+                     snake_minus_head.shrink_head();
                      self.snakes.push(snake_minus_head);
                      break;
                   }
