@@ -1,6 +1,6 @@
 pub mod snake;
 
-use std::{mem::swap, num::NonZeroU16};
+use std::mem::swap;
 
 use macroquad::{math::{I16Vec2, U16Vec2}, rand::{srand, RandomRange}};
 use posturn::Play;
@@ -33,14 +33,7 @@ impl Game {
                   (snake_index != overlapping_index && snake.start() == overlapping_snake.start() && overlapping_snake.can_decap(&snake))
                {
                   overlapped = true;
-                  if snake.len() == NonZeroU16::MIN {
-                     // If the Snake is just a head, we simply don't add it back into the game.
-                     break;
-                  }
-                  else {
-                     // Otherwise, add just the tail.
-                     let mut snake_minus_head = snake.clone();
-                     snake_minus_head.shrink_head();
+                  if let Some(snake_minus_head) = snake.clone().shrink_head() {
                      self.snakes.push(snake_minus_head);
                      break;
                   }
@@ -64,6 +57,7 @@ impl Play for Game {
    fn play(ctx : posturn::Context<Self>) -> impl std::future::Future<Output = Self::Outcome> {
       async move {
          srand(ctx.host.borrow_game().random_seed);
+         let mut old_snakes = vec![];
 
          loop {
             let input = ctx.yield_event(WaitForInput).await;
@@ -72,8 +66,12 @@ impl Play for Game {
                let play_area_half_extents = game.play_area_half_extents;
                let player_index = game.player_index;
 
-               for (index, snake) in &mut game.snakes.iter_mut().enumerate() {
+               swap(&mut old_snakes, &mut game.snakes);
+               game.snakes.clear();
+
+               for (index, mut snake) in old_snakes.drain(..).enumerate() {
                   if !snake.alive {
+                     game.snakes.push(snake);
                      continue;
                   }
 
@@ -134,9 +132,10 @@ impl Play for Game {
                   }
 
                   assert_ne!(prev_head_pos, snake.start());
-                  snake.shrink_tail();
+                  snake = snake.shrink_tail().unwrap();
 
                   assert_eq!(snake.len(), old_len, "The snake should always stay the same length");
+                  game.snakes.push(snake);
                }
 
                game.handle_collisions();

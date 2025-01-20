@@ -142,7 +142,7 @@ impl Snake {
       self.segments.push_front(Segment::with_facing(ccw));
    }
 
-   pub fn shrink_head(&mut self) {
+   pub fn shrink_head(mut self) -> Option<Self> {
       // If it had a head, now it doesn't.
       self.alive = false;
 
@@ -161,10 +161,10 @@ impl Snake {
          };
 
       self.start = self.start + direction;
-      assert!(!self.segments.is_empty());
+      if !self.segments.is_empty() { Some(self) } else { None }
    }
 
-   pub fn shrink_tail(&mut self) {
+   pub fn shrink_tail(mut self) -> Option<Self> {
       let len = self.segments.back().unwrap().len;
       let new_len = len.get().saturating_sub(1);
 
@@ -175,7 +175,7 @@ impl Snake {
          self.segments.pop_back();
       }
 
-      assert!(!self.segments.is_empty());
+      if !self.segments.is_empty() { Some(self) } else { None }
    }
 
    pub fn can_decap(&self, other : &Snake) -> bool {
