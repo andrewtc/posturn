@@ -20,30 +20,27 @@ pub struct Game
 }
 
 impl Game {
-   fn handle_collisions(&mut self) {
-      let mut old_snakes = vec![];
-      swap(&mut old_snakes, &mut self.snakes);
-
-      for (snake_index, snake) in old_snakes.iter().enumerate() {
-         let mut overlapped = false;
+   fn handle_pre_collisions(&mut self, old_snakes : &Vec<Snake>) {
+      for (snake_index, snake) in self.snakes.iter_mut().enumerate() {
+         let dest = snake.start() + snake.facing();
 
          if snake.alive {
+            if snake.is_overlapping(dest) {
+               // A Snake dies if it bites itself.
+               snake.alive = false;
+            }
+
             for (overlapping_index, overlapping_snake) in old_snakes.iter().enumerate() {
-               if (snake_index == overlapping_index && snake.is_overlapping_self()) ||
-                  (snake_index != overlapping_index && snake.start() == overlapping_snake.start() && overlapping_snake.can_decap(&snake))
+               if snake_index == overlapping_index {
+                  continue;
+               }
+
+               if overlapping_snake.start() == dest && overlapping_snake.can_decap(&snake)
                {
-                  overlapped = true;
-                  if let Some(snake_minus_head) = snake.clone().shrink_head() {
-                     self.snakes.push(snake_minus_head);
-                     break;
-                  }
+                  // A Snake dies if it runs into the head of a bigger Snake.
+                  snake.alive = false;
                }
             }
-         }
-
-         if !overlapped {
-            // If we get here, no overlaps occurred. Simply add the Snake back into the game.
-            self.snakes.push(snake.clone());
          }
       }
    }
@@ -66,7 +63,11 @@ impl Play for Game {
                let play_area_half_extents = game.play_area_half_extents;
                let player_index = game.player_index;
 
-               swap(&mut old_snakes, &mut game.snakes);
+               old_snakes = game.snakes.clone();
+               
+               game.handle_pre_collisions(&old_snakes);
+               
+               swap(&mut game.snakes, &mut old_snakes);
                game.snakes.clear();
 
                for (index, mut snake) in old_snakes.drain(..).enumerate() {
@@ -137,8 +138,6 @@ impl Play for Game {
                   assert_eq!(snake.len(), old_len, "The snake should always stay the same length");
                   game.snakes.push(snake);
                }
-
-               game.handle_collisions();
             });
          }
       }

@@ -191,11 +191,6 @@ impl Snake {
       self.overlaps(tile).next().is_some()
    }
 
-   pub fn is_overlapping_self(&self) -> bool {
-      // Snakes only overlap with themselves if the head touches a body segment.
-      self.overlaps(self.start).any(|(index, _)| index > 0)
-   }
-
    pub fn start(&self) -> I16Vec2 {
       self.start
    }
