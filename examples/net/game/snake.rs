@@ -106,6 +106,7 @@ pub struct SpawnParams {
 
 #[derive(Clone, Debug)]
 pub struct Snake {
+   pub player_index : usize,
    pub alive : bool,
    start : I16Vec2,
    segments : VecDeque<Segment>,
@@ -113,9 +114,10 @@ pub struct Snake {
 }
 
 impl Snake {
-   pub fn new(params : SpawnParams) -> Self {
+   pub fn spawn(player_index : usize, params : SpawnParams) -> Self {
       assert!(!params.segments.is_empty());
       Self {
+         player_index,
          alive: params.alive,
          start: params.start,
          segments: params.segments,

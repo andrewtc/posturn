@@ -61,7 +61,6 @@ impl Play for Game {
 
             ctx.host.with_game_mut(|mut game| {
                let play_area_half_extents = game.play_area_half_extents;
-               let player_index = game.player_index;
 
                old_snakes = game.snakes.clone();
                
@@ -70,7 +69,8 @@ impl Play for Game {
                swap(&mut game.snakes, &mut old_snakes);
                game.snakes.clear();
 
-               for (index, mut snake) in old_snakes.drain(..).enumerate() {
+               let player_index =  game.player_index;
+               for mut snake in old_snakes.drain(..) {
                   if !snake.alive {
                      game.snakes.push(snake);
                      continue;
@@ -111,7 +111,7 @@ impl Play for Game {
                         snake.grow_forward();
                      }
                   }
-                  else if index != player_index {
+                  else if snake.player_index != player_index {
                      // Turn randomly to simulate player input.
                      const CHANCE_TO_TURN : f32 = 0.1;
                      if f32::gen_range(0.0, 1.0) <= CHANCE_TO_TURN {

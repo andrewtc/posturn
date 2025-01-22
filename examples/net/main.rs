@@ -18,8 +18,8 @@ async fn main() {
    const PLAY_AREA_HALF_EXTENTS : U16Vec2 = u16vec2(20, 15);
    const RANDOM_SEED : u64 = 12345;
 
-   let snakes = vec![
-      Snake::new(SpawnParams {
+   let snakes = [
+      SpawnParams {
          alive: true,
          start: i16vec2(-19, -13),
          segments: vec![
@@ -29,8 +29,8 @@ async fn main() {
             Segment::new(Direction::West,  2),
          ].into(),
          color: GREEN,
-      }),
-      Snake::new(SpawnParams {
+      },
+      SpawnParams {
          alive: true,
          start: i16vec2(10, -5),
          segments: vec![
@@ -40,8 +40,8 @@ async fn main() {
             Segment::new(Direction::East,  1),
          ].into(),
          color: BLUE,
-      }),
-      Snake::new(SpawnParams {
+      },
+      SpawnParams {
          alive: true,
          start: i16vec2(5, 10),
          segments: vec![
@@ -55,8 +55,8 @@ async fn main() {
             Segment::new(Direction::East,  2),
          ].into(),
          color: PURPLE,
-      }),
-      Snake::new(SpawnParams {
+      },
+      SpawnParams {
          alive: true,
          start: i16vec2(-9, -5),
          segments: vec![
@@ -70,30 +70,34 @@ async fn main() {
             Segment::new(Direction::West,  2),
          ].into(),
          color: RED,
-      }),
-      Snake::new(SpawnParams {
+      },
+      SpawnParams {
          alive: true,
          start: i16vec2(20, 15),
          segments: vec![
             Segment::new(Direction::West, 8),
          ].into(),
          color: YELLOW,
-      }),
-      Snake::new(SpawnParams {
+      },
+      SpawnParams {
          alive: true,
          start: i16vec2(-3, -3),
          segments: vec![
             Segment::new(Direction::West, 1),
          ].into(),
          color: ORANGE,
-      }),
-   ];
+      },
+   ]
+   .into_iter()
+   .enumerate()
+   .map(|(player_index, params)| Snake::spawn(player_index, params))
+   .collect();
 
    let host = posturn::Host::new(Game {
+      player_index: 3,
       play_area_half_extents: PLAY_AREA_HALF_EXTENTS,
       random_seed: RANDOM_SEED,
       snakes,
-      player_index: 3,
    });
 
    let co = host.play().unwrap();
