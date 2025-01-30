@@ -22,7 +22,7 @@ pub struct Game
 impl Game {
    fn handle_pre_collisions(&mut self, old_snakes : &Vec<Snake>) {
       for (snake_index, snake) in self.snakes.iter_mut().enumerate() {
-         let dest = snake.start() + snake.facing();
+         let dest = snake.head_tile() + snake.facing();
 
          if snake.alive {
             if snake.is_overlapping(dest) {
@@ -35,7 +35,7 @@ impl Game {
                   continue;
                }
 
-               if overlapping_snake.start() == dest && overlapping_snake.can_decap(&snake)
+               if overlapping_snake.head_tile() == dest && overlapping_snake.can_decap(&snake)
                {
                   // A Snake dies if it runs into the head of a bigger Snake.
                   snake.alive = false;
@@ -78,11 +78,11 @@ impl Play for Game {
 
                   let old_len = snake.len();
                   let facing = snake.facing();
-                  let prev_head_pos = snake.start();
-                  let next_head_pos = prev_head_pos + facing;
+                  let prev_head_tile = snake.head_tile();
+                  let next_head_tile = prev_head_tile + facing;
                   let facing_delta = facing.delta();
                   let (cw, ccw) = (facing.cw(), facing.ccw());
-                  let play_area_delta = next_head_pos.saturating_div(play_area_half_extents.as_i16vec2());
+                  let play_area_delta = next_head_tile.saturating_div(play_area_half_extents.as_i16vec2());
 
                   if play_area_delta != I16Vec2::ZERO {
                      // This snake is going to be outside the play area. Turn around and move back toward the center.
@@ -132,7 +132,7 @@ impl Play for Game {
                      snake.grow_forward();
                   }
 
-                  assert_ne!(prev_head_pos, snake.start());
+                  assert_ne!(prev_head_tile, snake.head_tile());
                   snake = snake.shrink_tail().unwrap();
 
                   assert_eq!(snake.len(), old_len, "The snake should always stay the same length");

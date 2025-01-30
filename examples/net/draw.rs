@@ -48,37 +48,39 @@ pub fn draw_segment(start : Vec2, end : Vec2, color : Color) {
 }
 
 pub fn draw_snake(snake : &Snake, turn_progress : f32, color_override : Option<Color>) {
-   // Draw the body.
-   let mut head_pos = grid_to_window(snake.start());
-   let num_segments = snake.num_segments();
+   let mut last_segment_end_tile = snake.head_tile();
+   let mut head_screen_pos = grid_to_window(last_segment_end_tile);
+
+   if snake.alive {
+      let previous_head_tile = last_segment_end_tile + snake.facing().opposite();
+      head_screen_pos = interp_pos(
+         grid_to_window(previous_head_tile),
+         head_screen_pos,
+         turn_progress);
+   };
+
+   let mut last_segment_end_pos = head_screen_pos;
    let color = color_override.unwrap_or(snake.color);
 
-   for (index, (tiles, segment)) in snake.segments().enumerate() {
-      let mut from = grid_to_window(*tiles.start());
+   for (tiles, _) in snake.segments() {
+      let segment_end_pos = grid_to_window(*tiles.end());
+      draw_segment(last_segment_end_pos, segment_end_pos, color);
+      last_segment_end_tile = *tiles.end();
+      last_segment_end_pos = grid_to_window(last_segment_end_tile);
+   }
 
-      if index == 0 && snake.alive {
-         let next_start = *tiles.start() + segment.direction;
-         from = interp_pos(
-            grid_to_window(next_start),
-            from,
+   if snake.alive {
+      if let Some(tail_dir) = snake.prev_tail_dir() {
+         let tail_start_pos = grid_to_window(last_segment_end_tile);
+         let tail_end_tile = last_segment_end_tile + tail_dir;
+         let tail_end_pos = interp_pos(
+            grid_to_window(tail_end_tile),
+            tail_start_pos,
             turn_progress);
-
-         head_pos = from;
-      };
-
-      let mut to = grid_to_window(*tiles.end());
-
-      if index + 1 == num_segments && snake.alive {
-         let next_end = *tiles.end() + segment.facing();
-         to = interp_pos(
-            to,
-            grid_to_window(next_end),
-            turn_progress);
+            draw_segment(tail_start_pos, tail_end_pos, color);
       }
-            
-      draw_segment(from, to, color);
    }
 
    // Draw the head on top of the rest of the body.
-   draw_head(head_pos, snake.facing(), color, snake.alive);
+   draw_head(head_screen_pos, snake.facing(), color, snake.alive);
 }

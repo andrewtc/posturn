@@ -21,59 +21,59 @@ async fn main() {
    let snakes = [
       SpawnParams {
          alive: true,
-         start: i16vec2(-19, -13),
+         head_tile_pos: i16vec2(-19, -13),
          segments: vec![
-            Segment::new(Direction::South, 3),
-            Segment::new(Direction::East,  8),
-            Segment::new(Direction::North, 2),
-            Segment::new(Direction::West,  2),
+            Segment::new(Direction::South, 2),
+            Segment::new(Direction::East,  7),
+            Segment::new(Direction::North, 1),
+            Segment::new(Direction::West,  1),
          ].into(),
          color: GREEN,
       },
       SpawnParams {
          alive: true,
-         start: i16vec2(10, -5),
+         head_tile_pos: i16vec2(10, -5),
          segments: vec![
-            Segment::new(Direction::North, 5),
-            Segment::new(Direction::West,  3),
-            Segment::new(Direction::South, 4),
+            Segment::new(Direction::North, 4),
+            Segment::new(Direction::West,  2),
+            Segment::new(Direction::South, 3),
             Segment::new(Direction::East,  1),
          ].into(),
          color: BLUE,
       },
       SpawnParams {
          alive: true,
-         start: i16vec2(5, 10),
+         head_tile_pos: i16vec2(5, 10),
          segments: vec![
-            Segment::new(Direction::South, 2),
-            Segment::new(Direction::East,  2),
-            Segment::new(Direction::North, 2),
-            Segment::new(Direction::East,  2),
-            Segment::new(Direction::South, 2),
-            Segment::new(Direction::East,  2),
-            Segment::new(Direction::North, 2),
-            Segment::new(Direction::East,  2),
+            Segment::new(Direction::South, 1),
+            Segment::new(Direction::East,  1),
+            Segment::new(Direction::North, 1),
+            Segment::new(Direction::East,  1),
+            Segment::new(Direction::South, 1),
+            Segment::new(Direction::East,  1),
+            Segment::new(Direction::North, 1),
+            Segment::new(Direction::East,  1),
          ].into(),
          color: PURPLE,
       },
       SpawnParams {
          alive: true,
-         start: i16vec2(-9, -5),
+         head_tile_pos: i16vec2(-9, -5),
          segments: vec![
-            Segment::new(Direction::North, 2),
-            Segment::new(Direction::East,  2),
-            Segment::new(Direction::North, 2),
-            Segment::new(Direction::West,  2),
-            Segment::new(Direction::North, 2),
-            Segment::new(Direction::East,  2),
-            Segment::new(Direction::North, 2),
-            Segment::new(Direction::West,  2),
+            Segment::new(Direction::North, 1),
+            Segment::new(Direction::East,  1),
+            Segment::new(Direction::North, 1),
+            Segment::new(Direction::West,  1),
+            Segment::new(Direction::North, 1),
+            Segment::new(Direction::East,  1),
+            Segment::new(Direction::North, 1),
+            Segment::new(Direction::West,  1),
          ].into(),
          color: RED,
       },
       SpawnParams {
          alive: true,
-         start: i16vec2(20, 15),
+         head_tile_pos: i16vec2(20, 15),
          segments: vec![
             Segment::new(Direction::West, 8),
          ].into(),
@@ -81,7 +81,7 @@ async fn main() {
       },
       SpawnParams {
          alive: true,
-         start: i16vec2(-3, -3),
+         head_tile_pos: i16vec2(-3, -3),
          segments: vec![
             Segment::new(Direction::West, 1),
          ].into(),
@@ -107,8 +107,8 @@ async fn main() {
 
    let mut paused = true;
 
-   const TURN_DURATION : Duration = Duration::from_millis(75);
-   let mut turn_time_elapsed = Duration::ZERO;
+   const TURN_DURATION : Duration = Duration::from_millis(100);
+   let mut time_until_next_turn = Duration::ZERO;
 
    loop {
       const KEY_PAUSE : KeyCode = KeyCode::Space;
@@ -124,9 +124,17 @@ async fn main() {
          else { None };
 
       if !paused {
-         turn_time_elapsed += Duration::from_secs_f32(time::get_frame_time());
-         if turn_time_elapsed >= TURN_DURATION {
-            turn_time_elapsed -= TURN_DURATION;
+         let time_elapsed = Duration::from_secs_f32(time::get_frame_time());
+         let mut should_take_turn = false;
+
+         time_until_next_turn = time_until_next_turn
+            .checked_sub(time_elapsed)
+            .unwrap_or_else(|| {
+               should_take_turn = true;
+               TURN_DURATION - (time_elapsed - time_until_next_turn)
+            });
+
+         if should_take_turn {
             co.as_mut().resume_with(input);
          }
       }
@@ -134,7 +142,7 @@ async fn main() {
       const BG_COLOR : Color = Color::new(0.73, 0.4, 0.17, 1f32);
       clear_background(BG_COLOR);
 
-      let turn_progress = turn_time_elapsed.div_duration_f32(TURN_DURATION);
+      let turn_progress = 1f32 - time_until_next_turn.div_duration_f32(TURN_DURATION);
       host.with_game(|game| {
          for snake in game.snakes.iter() {
             draw::draw_snake(snake, turn_progress, None);

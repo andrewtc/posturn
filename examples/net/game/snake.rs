@@ -55,6 +55,26 @@ impl Direction {
    }
 }
 
+pub trait Offset {
+   type Output : Sized;
+   type Offset : Sized;
+   fn offset(self, dir : Direction, offset : Self::Offset) -> Self::Output;
+}
+
+impl Offset for I16Vec2 {
+   type Output = Self;
+   type Offset = i16;
+   fn offset(self, dir : Direction, offset : i16) -> Self::Output {
+      let Self { x, y } = self;
+      match dir {
+         Direction::West  => i16vec2(x - offset, y),
+         Direction::East  => i16vec2(x + offset, y),
+         Direction::North => i16vec2(x, y - offset),
+         Direction::South => i16vec2(x, y + offset),
+      }
+   }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct Segment {
    pub direction : Direction,
@@ -75,31 +95,17 @@ impl Segment {
    }
 }
 
-impl Add<Segment> for I16Vec2 {
-   type Output = Self;
-   fn add(self, segment: Segment) -> Self::Output {
-      let I16Vec2 { x, y } = self;
-      let offset = segment.len.get() as i16;
-      match segment.direction {
-         Direction::West  => i16vec2(x - offset, y),
-         Direction::East  => i16vec2(x + offset, y),
-         Direction::North => i16vec2(x, y - offset),
-         Direction::South => i16vec2(x, y + offset),
-      }
-   }
-}
-
 impl Add<Direction> for I16Vec2 {
    type Output = Self;
    fn add(self, direction: Direction) -> Self::Output {
-      self + Segment{ direction, len: NonZeroU8::MIN }
+      self.offset(direction, 1)
    }
 }
 
 #[derive(Debug)]
 pub struct SpawnParams {
    pub alive : bool,
-   pub start : I16Vec2,
+   pub head_tile_pos : I16Vec2,
    pub segments : VecDeque<Segment>,
    pub color : Color,
 }
@@ -108,8 +114,9 @@ pub struct SpawnParams {
 pub struct Snake {
    pub player_index : usize,
    pub alive : bool,
-   start : I16Vec2,
+   head_tile : I16Vec2,
    segments : VecDeque<Segment>,
+   prev_tail_dir : Option<Direction>,
    pub color : Color,
 }
 
@@ -119,28 +126,29 @@ impl Snake {
       Self {
          player_index,
          alive: params.alive,
-         start: params.start,
+         head_tile: params.head_tile_pos,
          segments: params.segments,
+         prev_tail_dir: None,
          color: params.color,
       }
    }
 
    pub fn grow_forward(&mut self) {
       // Move the head forward by one tile.
-      self.start = self.start + self.facing();
+      self.head_tile = self.head_tile + self.facing();
       let head = self.segments.front_mut().unwrap();
       head.len = head.len.saturating_add(1);
    }
 
    pub fn grow_cw(&mut self) {
       let cw = self.facing().cw();
-      self.start = self.start + cw;
+      self.head_tile = self.head_tile + cw;
       self.segments.push_front(Segment::with_facing(cw));
    }
 
    pub fn grow_ccw(&mut self) {
       let ccw = self.facing().ccw();
-      self.start = self.start + ccw;
+      self.head_tile = self.head_tile + ccw;
       self.segments.push_front(Segment::with_facing(ccw));
    }
 
@@ -162,19 +170,24 @@ impl Snake {
             segment.direction
          };
 
-      self.start = self.start + direction;
+      self.head_tile = self.head_tile + direction;
       if !self.segments.is_empty() { Some(self) } else { None }
    }
 
    pub fn shrink_tail(mut self) -> Option<Self> {
-      let len = self.segments.back().unwrap().len;
-      let new_len = len.get().saturating_sub(1);
+      let last_segment = self.segments.back().expect("Snake cannot be made shorter!");
+      let new_segment_len = last_segment.len.get().saturating_sub(1);
 
-      if new_len > 0 {
-         self.segments.back_mut().unwrap().len = new_len.try_into().unwrap();
+      if new_segment_len > 0 {
+         // Shorten the existing Segment.
+         let last_segment_mut = self.segments.back_mut().unwrap();
+         last_segment_mut.len = new_segment_len.try_into().unwrap();
+         self.prev_tail_dir = Some(last_segment_mut.direction);
       }
       else {
-         self.segments.pop_back();
+         // We're at a corner, so the Segment needs to completely disappear.
+         let last_segment = self.segments.pop_back().unwrap();
+         self.prev_tail_dir = Some(last_segment.direction);
       }
 
       if !self.segments.is_empty() { Some(self) } else { None }
@@ -193,16 +206,20 @@ impl Snake {
       self.overlaps(tile).next().is_some()
    }
 
-   pub fn start(&self) -> I16Vec2 {
-      self.start
+   pub fn head_tile(&self) -> I16Vec2 {
+      self.head_tile
    }
 
    pub fn segments(&self) -> Segments<'_> {
-      Segments { next_start: self.start, inner: self.segments.iter() }
+      Segments { last_segment_end_tile: self.head_tile, inner: self.segments.iter() }
    }
 
    pub fn num_segments(&self) -> usize {
       self.segments.len()
+   }
+
+   pub fn prev_tail_dir(&self) -> Option<Direction> {
+      self.prev_tail_dir
    }
 
    pub fn facing(&self) -> Direction {
@@ -210,8 +227,13 @@ impl Snake {
    }
 
    pub fn len(&self) -> NonZeroU16 {
-      let len : u16 = self.segments.iter().map(|segment| segment.len.get() as u16).sum();
-      len.try_into().unwrap()
+      // The length of the Snake is the length of its Segments...
+      let len_segments = self.segments.iter()
+         .map(|segment| segment.len.get() as u16)
+         .sum();
+
+      // ...plus one for the head.
+      NonZeroU16::MIN.saturating_add(len_segments)
    }
 }
 
@@ -219,7 +241,7 @@ impl Snake {
 /// as a [`RangeInclusive`] of [`I16Vec2`].
 #[derive(Debug)]
 pub struct Segments<'iter> {
-   next_start : I16Vec2,
+   last_segment_end_tile : I16Vec2,
    inner : vec_deque::Iter<'iter, Segment>,
 }
 
@@ -234,9 +256,9 @@ impl<'iter> Iterator for Segments<'iter> {
 
    fn next(&mut self) -> Option<Self::Item> {
       self.inner.next().map(|segment| {
-         let start = self.next_start;
-         let end = start + *segment;
-         self.next_start = end;
+         let start = self.last_segment_end_tile + segment.direction;
+         let end = self.last_segment_end_tile.offset(segment.direction, segment.len.get() as i16);
+         self.last_segment_end_tile = end;
          (RangeInclusive::new(start, end), segment)
       })
    }
