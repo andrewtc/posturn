@@ -262,6 +262,7 @@ mod tests {
 
    #[test]
    fn test_snake_spawn() {
+      let beige = Color::from_rgba(245, 245, 220, 255);
       let params : SpawnParams = SpawnParams {
          alive: true,
          head_tile_pos: i16vec2(2, -3),
@@ -271,7 +272,7 @@ mod tests {
             (Direction::East, 4),
             (Direction::North, 1),
          ],
-         color: Color::from_rgba(255, 128, 0, 255),
+         color: beige,
       };
 
       const PLAYER_INDEX : usize = 1;
@@ -291,5 +292,7 @@ mod tests {
          assert_eq!(tiles, *expected_tiles, "Tiles for Segment {index} were incorrect");
          assert_eq!(*segment, Segment::try_from(*expected_segment).unwrap(), "Segment {index} was incorrect");
       }
+
+      assert_eq!(snake.color, beige);
    }
 }
