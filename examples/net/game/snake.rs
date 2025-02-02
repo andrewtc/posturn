@@ -32,7 +32,7 @@ impl TryFrom<(Direction, u8)> for Segment {
 pub struct SpawnParams {
    pub alive : bool,
    pub head_tile_pos : I16Vec2,
-   pub segments : VecDeque<(Direction, u8)>,
+   pub segments : Vec<(Direction, u8)>,
    pub color : Color,
 }
 

@@ -27,7 +27,7 @@ async fn main() {
             (Direction::East,  7),
             (Direction::North, 1),
             (Direction::West,  1),
-         ].into(),
+         ],
          color: GREEN,
       },
       SpawnParams {
@@ -38,7 +38,7 @@ async fn main() {
             (Direction::West,  2),
             (Direction::South, 3),
             (Direction::East,  1),
-         ].into(),
+         ],
          color: BLUE,
       },
       SpawnParams {
@@ -53,7 +53,7 @@ async fn main() {
             (Direction::East,  1),
             (Direction::North, 1),
             (Direction::East,  1),
-         ].into(),
+         ],
          color: PURPLE,
       },
       SpawnParams {
@@ -68,7 +68,7 @@ async fn main() {
             (Direction::East,  1),
             (Direction::North, 1),
             (Direction::West,  1),
-         ].into(),
+         ],
          color: RED,
       },
       SpawnParams {
@@ -76,7 +76,7 @@ async fn main() {
          head_tile_pos: i16vec2(20, 15),
          segments: vec![
             (Direction::West, 8),
-         ].into(),
+         ],
          color: YELLOW,
       },
       SpawnParams {
@@ -84,7 +84,7 @@ async fn main() {
          head_tile_pos: i16vec2(-3, -3),
          segments: vec![
             (Direction::West, 1),
-         ].into(),
+         ],
          color: ORANGE,
       },
    ]
