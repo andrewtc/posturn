@@ -1,4 +1,4 @@
-use std::{collections::{vec_deque, VecDeque}, iter::Enumerate, num::{NonZeroU16, NonZeroU8, TryFromIntError}, ops::{Add, RangeInclusive}};
+use std::{collections::{vec_deque, VecDeque}, iter::Enumerate, num::{NonZeroU16, NonZeroU8, TryFromIntError}, ops::RangeInclusive};
 use macroquad::prelude::*;
 
 use super::direction::{Direction, Offset};
@@ -25,13 +25,6 @@ impl TryFrom<(Direction, u8)> for Segment {
    fn try_from(value: (Direction, u8)) -> Result<Self, Self::Error> {
       let (direction, raw_len) = value;
       Ok(Self { direction, len: raw_len.try_into()? })
-   }
-}
-
-impl Add<Direction> for I16Vec2 {
-   type Output = Self;
-   fn add(self, direction: Direction) -> Self::Output {
-      self.offset(direction, 1)
    }
 }
 
