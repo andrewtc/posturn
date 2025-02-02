@@ -1,8 +1,9 @@
-use std::{collections::{vec_deque, VecDeque}, iter::Enumerate, num::{NonZeroU16, NonZeroU8}, ops::{Add, RangeInclusive}};
+use std::{collections::{vec_deque, VecDeque}, iter::Enumerate, num::{NonZeroU16, NonZeroU8, TryFromIntError}, ops::{Add, RangeInclusive}};
 use macroquad::prelude::*;
 
 use super::direction::{Direction, Offset};
 
+/// A straight section of a [`Snake`], having a fixed length and facing a given [`Direction`].
 #[derive(Debug, Clone, Copy)]
 pub struct Segment {
    pub direction : Direction,
@@ -10,16 +11,20 @@ pub struct Segment {
 }
 
 impl Segment {
-   pub fn new(direction : Direction, len: u8) -> Self {
-      Self { direction, len: len.try_into().expect("Length cannot be zero") }
-   }
-
    pub fn with_facing(facing : Direction) -> Self {
       Self { direction: facing.opposite(), len: NonZeroU8::MIN }
    }
 
    pub fn facing(&self) -> Direction {
       self.direction.opposite()
+   }
+}
+
+impl TryFrom<(Direction, u8)> for Segment {
+   type Error = TryFromIntError;
+   fn try_from(value: (Direction, u8)) -> Result<Self, Self::Error> {
+      let (direction, raw_len) = value;
+      Ok(Self { direction, len: raw_len.try_into()? })
    }
 }
 
@@ -34,7 +39,7 @@ impl Add<Direction> for I16Vec2 {
 pub struct SpawnParams {
    pub alive : bool,
    pub head_tile_pos : I16Vec2,
-   pub segments : VecDeque<Segment>,
+   pub segments : VecDeque<(Direction, u8)>,
    pub color : Color,
 }
 
@@ -51,11 +56,15 @@ pub struct Snake {
 impl Snake {
    pub fn spawn(player_index : usize, params : SpawnParams) -> Self {
       assert!(!params.segments.is_empty());
+      let segments = params.segments.into_iter()
+         .map(|raw_parts| raw_parts.try_into().expect("Length cannot be zero"))
+         .collect();
+
       Self {
          player_index,
          alive: params.alive,
          head_tile: params.head_tile_pos,
-         segments: params.segments,
+         segments,
          prev_tail_dir: None,
          color: params.color,
       }
