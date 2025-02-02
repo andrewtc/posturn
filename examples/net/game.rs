@@ -1,3 +1,4 @@
+pub mod direction;
 pub mod snake;
 
 use std::mem::swap;
@@ -5,7 +6,8 @@ use std::mem::swap;
 use macroquad::{math::{I16Vec2, U16Vec2}, rand::{srand, RandomRange}};
 use posturn::Play;
 
-use snake::{Direction, Snake};
+use snake::Snake;
+use direction::Direction;
 
 #[derive(Debug, Clone, Copy)]
 pub struct WaitForInput;

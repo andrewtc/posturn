@@ -4,7 +4,7 @@ mod game;
 use std::time::Duration;
 
 use futures::pin_mut;
-use game::{Game, snake::{Direction, Segment, Snake, SpawnParams}};
+use game::{Game, direction::Direction, snake::{Segment, Snake, SpawnParams}};
 use genawaiter::Coroutine;
 use macroquad::{prelude::*, time};
 use miniquad::window::{screen_size, set_window_size};

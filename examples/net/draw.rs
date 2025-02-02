@@ -1,6 +1,6 @@
 use macroquad::prelude::*;
 
-use crate::game::snake::{Direction, Snake};
+use crate::game::{direction::Direction, snake::Snake};
 
 const TILE_SIZE : f32 = 24f32;
 
