@@ -231,10 +231,11 @@ impl<'iter> Iterator for Overlaps<'iter> {
 
 #[cfg(test)]
 mod tests {
-   use std::num::NonZeroU8;
+   use std::{num::NonZeroU8, ops::RangeInclusive};
 
-   use super::Segment;
-   use crate::Direction;
+   use macroquad::{color::Color, math::{i16vec2, I16Vec2}};
+
+   use super::{Direction, Segment, Snake, SpawnParams};
 
    #[test]
    fn test_segment_from_tuple() {
@@ -257,5 +258,38 @@ mod tests {
    fn test_segment_facing() {
       let segment = Segment::with_facing(Direction::North);
       assert_eq!(segment.facing(), Direction::North);
+   }
+
+   #[test]
+   fn test_snake_spawn() {
+      let params : SpawnParams = SpawnParams {
+         alive: true,
+         head_tile_pos: i16vec2(2, -3),
+         segments: vec![
+            (Direction::West, 3),
+            (Direction::South, 2),
+            (Direction::East, 4),
+            (Direction::North, 1),
+         ],
+         color: Color::from_rgba(255, 128, 0, 255),
+      };
+
+      const PLAYER_INDEX : usize = 1;
+      let snake = Snake::spawn(PLAYER_INDEX, params);
+
+      assert_eq!(snake.alive, true);
+      assert_eq!(snake.head_tile(), i16vec2(2, -3));
+
+      const EXPECTED_SEGMENTS : [(RangeInclusive<I16Vec2>, (Direction, u8)); 4] = [
+         (i16vec2(1, -3)..=i16vec2(-1, -3), (Direction::West, 3)),
+         (i16vec2(-1, -2)..=i16vec2(-1, -1), (Direction::South, 2)),
+         (i16vec2(0, -1)..=i16vec2(3, -1), (Direction::East, 4)),
+         (i16vec2(3, -2)..=i16vec2(3, -2), (Direction::North, 1)),
+      ];
+      
+      for (index, ((tiles, segment), (expected_tiles, expected_segment))) in snake.segments().zip(EXPECTED_SEGMENTS.iter()).enumerate() {
+         assert_eq!(tiles, *expected_tiles, "Tiles for Segment {index} were incorrect");
+         assert_eq!(*segment, Segment::try_from(*expected_segment).unwrap(), "Segment {index} was incorrect");
+      }
    }
 }
