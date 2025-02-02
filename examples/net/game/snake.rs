@@ -4,14 +4,14 @@ use macroquad::prelude::*;
 use super::direction::{Direction, Offset};
 
 /// A straight section of a [`Snake`], having a fixed length and facing a given [`Direction`].
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Segment {
    pub direction : Direction,
    pub len : NonZeroU8,
 }
 
 impl Segment {
-   pub fn with_facing(facing : Direction) -> Self {
+   pub const fn with_facing(facing : Direction) -> Self {
       Self { direction: facing.opposite(), len: NonZeroU8::MIN }
    }
 
@@ -233,5 +233,36 @@ impl<'iter> Iterator for Overlaps<'iter> {
             }
          }
       }
+   }
+}
+
+#[cfg(test)]
+mod tests {
+   use std::num::NonZeroU8;
+
+   use super::Segment;
+   use crate::Direction;
+
+   #[test]
+   fn test_segment_from_tuple() {
+      let segment : Segment = (Direction::East, 8).try_into().expect("Failed to create Segment");
+      assert_eq!(segment, Segment { direction: Direction::East, len: NonZeroU8::new(8).unwrap() });
+   }
+   
+   #[test]
+   fn test_segment_from_tuple_zero_length() {
+      Segment::try_from((Direction::East, 0)).expect_err("Length must be non-zero");
+   }
+
+   #[test]
+   fn test_segment_with_facing() {
+      let segment = Segment::with_facing(Direction::North);
+      assert_eq!(segment, Segment { direction: Direction::South, len: NonZeroU8::MIN });
+   }
+
+   #[test]
+   fn test_segment_facing() {
+      let segment = Segment::with_facing(Direction::North);
+      assert_eq!(segment.facing(), Direction::North);
    }
 }
