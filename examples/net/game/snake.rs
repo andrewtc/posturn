@@ -48,7 +48,6 @@ pub struct Snake {
 
 impl Snake {
    pub fn spawn(player_index : usize, params : SpawnParams) -> Self {
-      assert!(!params.segments.is_empty());
       let segments = params.segments.into_iter()
          .map(|raw_parts| raw_parts.try_into().expect("Length cannot be zero"))
          .collect();
@@ -64,10 +63,18 @@ impl Snake {
    }
 
    pub fn grow_forward(&mut self) {
-      // Move the head forward by one tile.
-      self.head_tile = self.head_tile + self.facing();
-      let head = self.segments.front_mut().unwrap();
-      head.len = head.len.saturating_add(1);
+      // Move the head forward by one tile in the facing direction.
+      let facing = self.facing();
+      self.head_tile = self.head_tile + facing;
+
+      if let Some(head) = self.segments.front_mut() {
+         // We have a front Segment, implying that the Snake is facing in the direction of the front Segment.
+         head.len = head.len.saturating_add(1);
+      }
+      else {
+         // The Snake is short enough that we need to add a Segment in order to move.
+         self.segments.push_back(Segment::with_facing(facing));
+      }
    }
 
    pub fn grow_cw(&mut self) {
@@ -86,7 +93,7 @@ impl Snake {
       // If it had a head, now it doesn't.
       self.alive = false;
 
-      let head_segment = self.segments.front().unwrap();
+      let head_segment = self.segments.front()?;
       let new_len = head_segment.len.get().saturating_sub(1);
 
       let direction =
@@ -101,11 +108,11 @@ impl Snake {
          };
 
       self.head_tile = self.head_tile + direction;
-      if !self.segments.is_empty() { Some(self) } else { None }
+      Some(self)
    }
 
    pub fn shrink_tail(mut self) -> Option<Self> {
-      let last_segment = self.segments.back().expect("Snake cannot be made shorter!");
+      let last_segment = self.segments.back()?;
       let new_segment_len = last_segment.len.get().saturating_sub(1);
 
       if new_segment_len > 0 {
@@ -120,7 +127,7 @@ impl Snake {
          self.prev_tail_dir = Some(last_segment.direction);
       }
 
-      if !self.segments.is_empty() { Some(self) } else { None }
+      Some(self)
    }
 
    pub fn can_decap(&self, other : &Snake) -> bool {
@@ -153,7 +160,10 @@ impl Snake {
    }
 
    pub fn facing(&self) -> Direction {
-      self.segments.front().unwrap().facing()
+      self.segments.front()
+         .map(|segment| segment.facing())
+         .or_else(|| self.prev_tail_dir.map(|dir| dir.opposite()))
+         .unwrap_or_default()
    }
 
    pub fn len(&self) -> NonZeroU16 {

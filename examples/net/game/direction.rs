@@ -2,8 +2,9 @@ use std::ops::Add;
 
 use macroquad::prelude::*;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub enum Direction {
+   #[default]
    West,
    East,
    North,

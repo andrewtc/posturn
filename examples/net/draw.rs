@@ -1,3 +1,5 @@
+use std::num::NonZeroU16;
+
 use macroquad::prelude::*;
 
 use crate::game::{direction::Direction, snake::Snake};
@@ -69,7 +71,7 @@ pub fn draw_snake(snake : &Snake, turn_progress : f32, color_override : Option<C
       last_segment_end_pos = grid_to_window(last_segment_end_tile);
    }
 
-   if snake.alive {
+   if snake.alive && snake.len() != NonZeroU16::MIN {
       if let Some(tail_dir) = snake.prev_tail_dir() {
          let tail_start_pos = grid_to_window(last_segment_end_tile);
          let tail_end_tile = last_segment_end_tile + tail_dir;
