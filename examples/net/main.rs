@@ -99,7 +99,7 @@ async fn main() {
             .checked_sub(time_elapsed)
             .unwrap_or_else(|| {
                should_take_turn = true;
-               TURN_DURATION - (time_elapsed - time_until_next_turn)
+               TURN_DURATION - (time_elapsed - time_until_next_turn).min(TURN_DURATION)
             });
 
          if should_take_turn {
