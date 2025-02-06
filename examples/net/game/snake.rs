@@ -28,11 +28,11 @@ impl TryFrom<(Direction, u8)> for Segment {
    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct SpawnParams {
    pub alive : bool,
    pub head_tile_pos : I16Vec2,
-   pub segments : Vec<(Direction, u8)>,
+   pub len : u16,
    pub color : Color,
 }
 
@@ -42,22 +42,34 @@ pub struct Snake {
    pub alive : bool,
    head_tile : I16Vec2,
    segments : VecDeque<Segment>,
+   target_len : NonZeroU16,
    prev_tail_dir : Option<Direction>,
    pub color : Color,
 }
 
 impl Snake {
    pub fn spawn(player_index : usize, params : SpawnParams) -> Self {
-      let segments = params.segments.into_iter()
+      Self::spawn_with_segments(player_index, params, None)
+   }
+   
+   pub fn spawn_with_segments<I>(player_index : usize, params : SpawnParams, segments : I) -> Self where
+      I : IntoIterator<Item = (Direction, u8)>,
+   {
+      let segments : VecDeque<Segment> = segments.into_iter()
          .map(|raw_parts| raw_parts.try_into().expect("Length cannot be zero"))
          .collect();
+
+      // For ease of use, ensure that the length of the Snake always agrees with the target length.
+      let len = Self::measure(segments.iter());
+      let target_len = params.len.try_into().unwrap_or(len).max(len);
 
       Self {
          player_index,
          alive: params.alive,
          head_tile: params.head_tile_pos,
-         segments,
+         segments: VecDeque::new(),
          prev_tail_dir: None,
+         target_len,
          color: params.color,
       }
    }
@@ -166,14 +178,25 @@ impl Snake {
          .unwrap_or_default()
    }
 
-   pub fn len(&self) -> NonZeroU16 {
+   pub fn target_len(&self) -> NonZeroU16 {
+      self.target_len
+   }
+
+   pub fn measure<'i, I>(segments : I) -> NonZeroU16 where
+      I : IntoIterator<Item = &'i Segment>
+   {
       // The length of the Snake is the length of its Segments...
-      let len_segments = self.segments.iter()
+      let len_segments = segments
+         .into_iter()
          .map(|segment| segment.len.get() as u16)
          .sum();
 
       // ...plus one for the head.
       NonZeroU16::MIN.saturating_add(len_segments)
+   }
+
+   pub fn len(&self) -> NonZeroU16 {
+      Self::measure(self.segments.iter())
    }
 }
 
@@ -276,17 +299,19 @@ mod tests {
       let params : SpawnParams = SpawnParams {
          alive: true,
          head_tile_pos: i16vec2(2, -3),
-         segments: vec![
-            (Direction::West, 3),
-            (Direction::South, 2),
-            (Direction::East, 4),
-            (Direction::North, 1),
-         ],
          color: beige,
+         ..Default::default()
       };
 
       const PLAYER_INDEX : usize = 1;
-      let snake = Snake::spawn(PLAYER_INDEX, params);
+      let segments = vec![
+         (Direction::West, 3),
+         (Direction::South, 2),
+         (Direction::East, 4),
+         (Direction::North, 1),
+      ];
+
+      let snake = Snake::spawn_with_segments(PLAYER_INDEX, params, segments);
 
       assert_eq!(snake.alive, true);
       assert_eq!(snake.head_tile(), i16vec2(2, -3));

@@ -135,9 +135,13 @@ impl Play for Game {
                   }
 
                   assert_ne!(prev_head_tile, snake.head_tile());
-                  snake = snake.shrink_tail().unwrap();
 
-                  assert_eq!(snake.len(), old_len, "The snake should always stay the same length");
+                  if snake.len() >= snake.target_len() {
+                     // Unless we are growing, shrink the tail of the Snake during movement.
+                     snake = snake.shrink_tail().unwrap();
+                     assert_eq!(snake.len(), old_len, "The snake should always stay the same length");
+                  }
+
                   game.snakes.push(snake);
                }
             });

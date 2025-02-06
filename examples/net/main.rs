@@ -22,43 +22,37 @@ async fn main() {
       SpawnParams {
          alive: true,
          head_tile_pos: i16vec2(-19, -13),
-         segments: vec![
-         ],
+         len: 16,
          color: GREEN,
       },
       SpawnParams {
          alive: true,
          head_tile_pos: i16vec2(10, -5),
-         segments: vec![
-         ],
+         len: 11,
          color: BLUE,
       },
       SpawnParams {
          alive: true,
          head_tile_pos: i16vec2(5, 10),
-         segments: vec![
-         ],
+         len: 12,
          color: PURPLE,
       },
       SpawnParams {
          alive: true,
          head_tile_pos: i16vec2(-9, -5),
-         segments: vec![
-         ],
+         len: 14,
          color: RED,
       },
       SpawnParams {
          alive: true,
          head_tile_pos: i16vec2(20, 15),
-         segments: vec![
-         ],
+         len: 13,
          color: YELLOW,
       },
       SpawnParams {
          alive: true,
          head_tile_pos: i16vec2(-3, -3),
-         segments: vec![
-         ],
+         len: 15,
          color: ORANGE,
       },
    ]
