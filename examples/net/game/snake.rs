@@ -49,7 +49,7 @@ pub struct Snake {
    pub alive : bool,
    head_tile : I16Vec2,
    segments : VecDeque<Segment>,
-   target_len : NonZeroU16,
+   pub amt_to_grow : u16,
    prev_tail_dir : Option<Direction>,
    pub color : Color,
 }
@@ -66,9 +66,8 @@ impl Snake {
          .map(|raw_parts| raw_parts.try_into().expect("Length cannot be zero"))
          .collect();
 
-      // For ease of use, ensure that the length of the Snake always agrees with the target length.
       let len = Self::measure(segments.iter());
-      let target_len = params.len.try_into().unwrap_or(len).max(len);
+      let amt_to_grow = params.len.checked_sub(len.get()).expect("Snake is already longer than target length");
 
       let snake = Self {
          player_index,
@@ -76,7 +75,7 @@ impl Snake {
          head_tile: params.head_tile_pos,
          segments,
          prev_tail_dir: None,
-         target_len,
+         amt_to_grow,
          color: params.color,
       };
 
@@ -206,8 +205,8 @@ impl Snake {
          .unwrap_or_default()
    }
 
-   pub fn target_len(&self) -> NonZeroU16 {
-      self.target_len
+   pub fn is_growing(&self) -> bool {
+      self.amt_to_grow > 0
    }
 
    pub fn measure<'i, I>(segments : I) -> NonZeroU16 where
@@ -292,18 +291,19 @@ mod tests {
    }
 
    const SOME_PLAYER_INDEX : usize = 1;
-   fn make_spawn_params() -> SpawnParams {
+   fn make_spawn_params(len : u16) -> SpawnParams {
       SpawnParams {
          alive: true,
          head_tile_pos: i16vec2(2, -3),
          color: BEIGE,
+         len,
          ..Default::default()
       }
    }
 
    #[test]
    fn test_snake_spawn() {
-      let params = make_spawn_params();
+      let params = make_spawn_params(12); // NOTE: Target length is LONGER than Snake length
 
       let segments = vec![
          (Direction::West, 3),
@@ -317,6 +317,7 @@ mod tests {
 
       assert_eq!(snake.alive, true);
       assert_eq!(snake.head_tile(), i16vec2(2, -3));
+      assert_eq!(snake.amt_to_grow, 1);
 
       const EXPECTED_SEGMENTS : [(I16Vec2, (Direction, u8)); 4] = [
          (i16vec2(2, -3), (Direction::West, 3)),
@@ -335,7 +336,7 @@ mod tests {
 
    #[test]
    fn test_invalid_spawn() {
-      let params = make_spawn_params();
+      let params = make_spawn_params(9);
 
       let segments = vec![
          (Direction::North, 2),
