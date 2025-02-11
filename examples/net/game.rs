@@ -124,8 +124,8 @@ impl Play for Game {
                      }
                      else { false };
                   
-                  if !turned && snake.grow_forward().is_err() {
-                     // Snake can't turn or grow forward, so it is dead.
+                  if !turned && snake.grow_forward().is_err() && snake.grow_cw().is_err() && snake.grow_ccw().is_err() {
+                     // Snake can't move in any direction, so it is dead.
                      snake.alive = false;
                   }
 
