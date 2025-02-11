@@ -1,4 +1,4 @@
-use std::{collections::{vec_deque, VecDeque}, iter::Enumerate, num::{NonZeroU16, NonZeroU8, TryFromIntError}, ops::RangeInclusive};
+use std::{collections::{vec_deque, VecDeque}, num::{NonZeroU16, NonZeroU8, TryFromIntError}};
 use macroquad::prelude::*;
 
 use super::direction::{Direction, Offset};
@@ -17,6 +17,13 @@ impl Segment {
 
    pub fn facing(&self) -> Direction {
       self.direction.opposite()
+   }
+
+   pub fn endpoints(&self, corner : I16Vec2) -> (I16Vec2, I16Vec2) {
+      // Length is always measured from a CORNER, i.e. the endpoint of a previous Segment.
+      let start = corner + self.direction;
+      let end = corner.offset(self.direction, self.len.get() as i16);
+      (start, end)
    }
 }
 
@@ -49,10 +56,10 @@ pub struct Snake {
 
 impl Snake {
    pub fn spawn(player_index : usize, params : SpawnParams) -> Self {
-      Self::spawn_with_segments(player_index, params, None)
+      Self::try_spawn_with_segments(player_index, params, None).expect("Expected no Segment overlap")
    }
    
-   pub fn spawn_with_segments<I>(player_index : usize, params : SpawnParams, segments : I) -> Self where
+   pub fn try_spawn_with_segments<I>(player_index : usize, params : SpawnParams, segments : I) -> Result<Self, Overlap> where
       I : IntoIterator<Item = (Direction, u8)>,
    {
       let segments : VecDeque<Segment> = segments.into_iter()
@@ -63,21 +70,33 @@ impl Snake {
       let len = Self::measure(segments.iter());
       let target_len = params.len.try_into().unwrap_or(len).max(len);
 
-      Self {
+      let snake = Self {
          player_index,
          alive: params.alive,
          head_tile: params.head_tile_pos,
-         segments: VecDeque::new(),
+         segments,
          prev_tail_dir: None,
          target_len,
          color: params.color,
+      };
+
+      if let Some(overlap) = snake.find_body_overlap(snake.head_tile) {
+         return Err(overlap);
       }
+
+      Ok(snake)
    }
 
-   pub fn grow_forward(&mut self) {
+   pub fn grow_forward(&mut self) -> Result<(), Overlap> {
       // Move the head forward by one tile in the facing direction.
       let facing = self.facing();
-      self.head_tile = self.head_tile + facing;
+      let next_head_tile = self.head_tile + facing;
+
+      if let Some(overlap) = self.find_body_overlap(next_head_tile) {
+         return Err(overlap);
+      }
+
+      self.head_tile = next_head_tile;
 
       if let Some(head) = self.segments.front_mut() {
          // We have a front Segment, implying that the Snake is facing in the direction of the front Segment.
@@ -87,40 +106,36 @@ impl Snake {
          // The Snake is short enough that we need to add a Segment in order to move.
          self.segments.push_back(Segment::with_facing(facing));
       }
+
+      Ok(())
    }
 
-   pub fn grow_cw(&mut self) {
+   pub fn grow_cw(&mut self) -> Result<(), Overlap> {
       let cw = self.facing().cw();
-      self.head_tile = self.head_tile + cw;
+      let next_head_tile = self.head_tile + cw;
+
+      if let Some(overlap) = self.find_body_overlap(next_head_tile) {
+         return Err(overlap);
+      }
+
+      self.head_tile = next_head_tile;
       self.segments.push_front(Segment::with_facing(cw));
+
+      Ok(())
    }
 
-   pub fn grow_ccw(&mut self) {
+   pub fn grow_ccw(&mut self) -> Result<(), Overlap> {
       let ccw = self.facing().ccw();
-      self.head_tile = self.head_tile + ccw;
+      let next_head_tile = self.head_tile + ccw;
+
+      if let Some(overlap) = self.find_body_overlap(next_head_tile) {
+         return Err(overlap);
+      }
+
+      self.head_tile = next_head_tile;
       self.segments.push_front(Segment::with_facing(ccw));
-   }
 
-   pub fn shrink_head(mut self) -> Option<Self> {
-      // If it had a head, now it doesn't.
-      self.alive = false;
-
-      let head_segment = self.segments.front()?;
-      let new_len = head_segment.len.get().saturating_sub(1);
-
-      let direction =
-         if new_len == 0 {
-            let segment = self.segments.pop_front().unwrap();
-            segment.direction
-         }
-         else {
-            let segment = self.segments.front_mut().unwrap();
-            segment.len = new_len.try_into().unwrap();
-            segment.direction
-         };
-
-      self.head_tile = self.head_tile + direction;
-      Some(self)
+      Ok(())
    }
 
    pub fn shrink_tail(mut self) -> Option<Self> {
@@ -147,12 +162,29 @@ impl Snake {
       self.alive && other.alive && other.len() <= self.len()
    }
 
-   pub fn overlaps(&self, tile : I16Vec2) -> Overlaps<'_> {
-      Overlaps { tile, inner: self.segments().enumerate() }
-   }
+   pub fn find_body_overlap(&self, tile : I16Vec2) -> Option<Overlap> {
+      for (segment_index, (corner, segment)) in self.segments().enumerate() {
+         let segment_delta = segment.direction.delta();
+         let corner_to_tile = tile - corner;
 
-   pub fn is_overlapping(&self, tile : I16Vec2) -> bool {
-      self.overlaps(tile).next().is_some()
+         let offset : Option<u8> =
+            if corner_to_tile.x == 0 && segment_delta.x == 0 { (corner_to_tile.y * segment_delta.y).try_into().ok() }
+            else if corner_to_tile.y == 0 && segment_delta.y == 0 { (corner_to_tile.x * segment_delta.x).try_into().ok() }
+            else { None };
+
+         if let Some(offset) = offset {
+            if offset > 0 && offset <= segment.len.get() {
+               let overlap = Overlap { segment_index, offset };
+               return Some(overlap.into());
+            }
+         }
+         else {
+            // Tile does not fall along direction vector of Segment. No overlap.
+            continue;
+         };
+      }
+
+      None
    }
 
    pub fn head_tile(&self) -> I16Vec2 {
@@ -161,10 +193,6 @@ impl Snake {
 
    pub fn segments(&self) -> Segments<'_> {
       Segments { last_segment_end_tile: self.head_tile, inner: self.segments.iter() }
-   }
-
-   pub fn num_segments(&self) -> usize {
-      self.segments.len()
    }
 
    pub fn prev_tail_dir(&self) -> Option<Direction> {
@@ -200,8 +228,8 @@ impl Snake {
    }
 }
 
-/// An iterator over the [`Segment`s](Segment) of a [`Snake`]. Also outputs the start and end location of the `Segment`
-/// as a [`RangeInclusive`] of [`I16Vec2`].
+/// An iterator over the [`Segment`s](Segment) of a [`Snake`]. Also outputs an [`I16Vec2`] representing the **corner**
+/// to which the [`Segment`] is attached, i.e the end tile of the previous [`Segment`].
 #[derive(Debug)]
 pub struct Segments<'iter> {
    last_segment_end_tile : I16Vec2,
@@ -211,7 +239,7 @@ pub struct Segments<'iter> {
 impl<'iter> ExactSizeIterator for Segments<'iter> { }
 
 impl<'iter> Iterator for Segments<'iter> {
-   type Item = (RangeInclusive<I16Vec2>, &'iter Segment);
+   type Item = (I16Vec2, &'iter Segment);
 
    fn size_hint(&self) -> (usize, Option<usize>) {
       self.inner.size_hint()
@@ -219,56 +247,26 @@ impl<'iter> Iterator for Segments<'iter> {
 
    fn next(&mut self) -> Option<Self::Item> {
       self.inner.next().map(|segment| {
-         let start = self.last_segment_end_tile + segment.direction;
-         let end = self.last_segment_end_tile.offset(segment.direction, segment.len.get() as i16);
-         self.last_segment_end_tile = end;
-         (RangeInclusive::new(start, end), segment)
+         let corner = self.last_segment_end_tile;
+         self.last_segment_end_tile = corner.offset(segment.direction, segment.len.get().into());
+         (corner, segment)
       })
    }
 }
 
-#[derive(Debug)]
-pub struct Overlaps<'iter> {
-   tile : I16Vec2,
-   inner : Enumerate<Segments<'iter>>,
-}
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub struct Overlap {
+   /// The index of the [`Segment`] that overlaps with the tile.
+   pub segment_index : usize,
 
-impl<'iter> Iterator for Overlaps<'iter> {
-   type Item = (usize, &'iter Segment);
-
-   fn size_hint(&self) -> (usize, Option<usize>) {
-      self.inner.size_hint()
-   }
-
-   fn next(&mut self) -> Option<Self::Item> {
-      loop {
-         let (index, (tiles, segment)) = self.inner.next()?;
-         let start = tiles.start();
-         let end = tiles.end();
-
-         if segment.direction.is_horizontal() && self.tile.y == start.y {
-            let range_x = start.x.min(end.x) ..= start.x.max(end.x);
-            if range_x.contains(&self.tile.x) {
-               break Some((index, segment));
-            }
-         }
-         else if segment.direction.is_vertical() && self.tile.x == start.x {
-            let range_y = start.y.min(end.y) ..= start.y.max(end.y);
-            if range_y.contains(&self.tile.y) {
-               break Some((index, segment));
-            }
-         }
-      }
-   }
+   /// Where the tile overlaps, measured in whole tiles from the **corner** to which the [`Segment`] is attached, i.e.
+   /// the end tile of the previous [`Segment`].
+   pub offset : u8,
 }
 
 #[cfg(test)]
 mod tests {
-   use std::{num::NonZeroU8, ops::RangeInclusive};
-
-   use macroquad::{color::Color, math::{i16vec2, I16Vec2}};
-
-   use super::{Direction, Segment, Snake, SpawnParams};
+   use super::*;
 
    #[test]
    fn test_segment_from_tuple() {
@@ -293,17 +291,20 @@ mod tests {
       assert_eq!(segment.facing(), Direction::North);
    }
 
-   #[test]
-   fn test_snake_spawn() {
-      let beige = Color::from_rgba(245, 245, 220, 255);
-      let params : SpawnParams = SpawnParams {
+   const SOME_PLAYER_INDEX : usize = 1;
+   fn make_spawn_params() -> SpawnParams {
+      SpawnParams {
          alive: true,
          head_tile_pos: i16vec2(2, -3),
-         color: beige,
+         color: BEIGE,
          ..Default::default()
-      };
+      }
+   }
 
-      const PLAYER_INDEX : usize = 1;
+   #[test]
+   fn test_snake_spawn() {
+      let params = make_spawn_params();
+
       let segments = vec![
          (Direction::West, 3),
          (Direction::South, 2),
@@ -311,16 +312,17 @@ mod tests {
          (Direction::North, 1),
       ];
 
-      let snake = Snake::spawn_with_segments(PLAYER_INDEX, params, segments);
+      let snake = Snake::try_spawn_with_segments(SOME_PLAYER_INDEX, params, segments)
+         .expect("Expected Snake to spawn successfully");
 
       assert_eq!(snake.alive, true);
       assert_eq!(snake.head_tile(), i16vec2(2, -3));
 
-      const EXPECTED_SEGMENTS : [(RangeInclusive<I16Vec2>, (Direction, u8)); 4] = [
-         (i16vec2(1, -3)..=i16vec2(-1, -3), (Direction::West, 3)),
-         (i16vec2(-1, -2)..=i16vec2(-1, -1), (Direction::South, 2)),
-         (i16vec2(0, -1)..=i16vec2(3, -1), (Direction::East, 4)),
-         (i16vec2(3, -2)..=i16vec2(3, -2), (Direction::North, 1)),
+      const EXPECTED_SEGMENTS : [(I16Vec2, (Direction, u8)); 4] = [
+         (i16vec2(2, -3), (Direction::West, 3)),
+         (i16vec2(-1, -3), (Direction::South, 2)),
+         (i16vec2(-1, -1), (Direction::East, 4)),
+         (i16vec2(3, -1), (Direction::North, 1)),
       ];
       
       for (index, ((tiles, segment), (expected_tiles, expected_segment))) in snake.segments().zip(EXPECTED_SEGMENTS.iter()).enumerate() {
@@ -328,6 +330,23 @@ mod tests {
          assert_eq!(*segment, Segment::try_from(*expected_segment).unwrap(), "Segment {index} was incorrect");
       }
 
-      assert_eq!(snake.color, beige);
+      assert_eq!(snake.color, BEIGE);
+   }
+
+   #[test]
+   fn test_invalid_spawn() {
+      let params = make_spawn_params();
+
+      let segments = vec![
+         (Direction::North, 2),
+         (Direction::West,  2),
+         (Direction::South, 2),
+         (Direction::East,  2), // Overlaps with head!
+      ];
+
+      let overlap = Snake::try_spawn_with_segments(SOME_PLAYER_INDEX, params, segments)
+         .expect_err("Expected error when trying to spawn Snake");
+
+      assert_eq!(overlap, Overlap { segment_index: 3, offset: 2 });
    }
 }

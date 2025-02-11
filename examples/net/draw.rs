@@ -50,30 +50,32 @@ pub fn draw_segment(start : Vec2, end : Vec2, color : Color) {
 }
 
 pub fn draw_snake(snake : &Snake, turn_progress : f32, color_override : Option<Color>) {
-   let mut last_segment_end_tile = snake.head_tile();
-   let mut head_screen_pos = grid_to_window(last_segment_end_tile);
+   let head_tile = snake.head_tile();
+   let mut head_screen_pos = grid_to_window(head_tile);
 
    if snake.alive {
-      let previous_head_tile = last_segment_end_tile + snake.facing().opposite();
+      let previous_head_tile = head_tile + snake.facing().opposite();
       head_screen_pos = interp_pos(
          grid_to_window(previous_head_tile),
          head_screen_pos,
          turn_progress);
    };
 
+   let mut last_segment_end_tile = head_tile;
    let mut last_segment_end_pos = head_screen_pos;
    let color = color_override.unwrap_or(snake.color);
 
-   for (tiles, _) in snake.segments() {
-      let segment_end_pos = grid_to_window(*tiles.end());
+   for (corner, segment) in snake.segments() {
+      let (_, end) = segment.endpoints(corner);
+      let segment_end_pos = grid_to_window(end);
       draw_segment(last_segment_end_pos, segment_end_pos, color);
-      last_segment_end_tile = *tiles.end();
+      last_segment_end_tile = end;
       last_segment_end_pos = grid_to_window(last_segment_end_tile);
    }
 
    if snake.alive && snake.len() != NonZeroU16::MIN {
       if let Some(tail_dir) = snake.prev_tail_dir() {
-         let tail_start_pos = grid_to_window(last_segment_end_tile);
+         let tail_start_pos = last_segment_end_pos;
          let tail_end_tile = last_segment_end_tile + tail_dir;
          let tail_end_pos = interp_pos(
             grid_to_window(tail_end_tile),

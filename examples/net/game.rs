@@ -27,11 +27,6 @@ impl Game {
          let dest = snake.head_tile() + snake.facing();
 
          if snake.alive {
-            if snake.is_overlapping(dest) {
-               // A Snake dies if it bites itself.
-               snake.alive = false;
-            }
-
             for (overlapping_index, overlapping_snake) in old_snakes.iter().enumerate() {
                if snake_index == overlapping_index {
                   continue;
@@ -86,55 +81,55 @@ impl Play for Game {
                   let (cw, ccw) = (facing.cw(), facing.ccw());
                   let play_area_delta = next_head_tile.saturating_div(play_area_half_extents.as_i16vec2());
 
-                  if play_area_delta != I16Vec2::ZERO {
-                     // This snake is going to be outside the play area. Turn around and move back toward the center.
-                     let cw_delta = cw.delta();
-                     let ccw_delta = ccw.delta();
+                  let turned =
+                     if play_area_delta != I16Vec2::ZERO {
+                        // This snake is going to be outside the play area. Turn around and move back toward the center.
+                        let cw_delta = cw.delta();
+                        let ccw_delta = ccw.delta();
 
-                     if play_area_delta.x < 0 && cw_delta.x > 0 ||
-                        play_area_delta.x > 0 && cw_delta.x < 0 ||
-                        play_area_delta.y < 0 && cw_delta.y > 0 ||
-                        play_area_delta.y > 0 && cw_delta.y < 0 {
-                        snake.grow_cw();
+                        if play_area_delta.x < 0 && cw_delta.x > 0 ||
+                           play_area_delta.x > 0 && cw_delta.x < 0 ||
+                           play_area_delta.y < 0 && cw_delta.y > 0 ||
+                           play_area_delta.y > 0 && cw_delta.y < 0 {
+                           snake.grow_cw().is_ok()
+                        }
+                        else if play_area_delta.x < 0 && ccw_delta.x > 0 ||
+                           play_area_delta.x > 0 && ccw_delta.x < 0 ||
+                           play_area_delta.y < 0 && ccw_delta.y > 0 ||
+                           play_area_delta.y > 0 && ccw_delta.y < 0 {
+                           snake.grow_ccw().is_ok()
+                        }
+                        else if play_area_delta.x > 0 && facing_delta.x > 0 ||
+                           play_area_delta.x < 0 && facing_delta.x < 0 ||
+                           play_area_delta.y > 0 && facing_delta.y > 0 ||
+                           play_area_delta.y < 0 && facing_delta.y < 0 {
+                           snake.grow_cw().is_ok()
+                        }
+                        else { false }
                      }
-                     else if play_area_delta.x < 0 && ccw_delta.x > 0 ||
-                        play_area_delta.x > 0 && ccw_delta.x < 0 ||
-                        play_area_delta.y < 0 && ccw_delta.y > 0 ||
-                        play_area_delta.y > 0 && ccw_delta.y < 0 {
-                        snake.grow_ccw();
+                     else if snake.player_index != player_index {
+                        // Turn randomly to simulate player input.
+                        const CHANCE_TO_TURN : f32 = 0.1;
+                        if f32::gen_range(0.0, 1.0) <= CHANCE_TO_TURN {
+                           if u8::gen_range(0, 2) == 0 { snake.grow_cw().is_ok() }
+                           else { snake.grow_ccw().is_ok() }
+                        }
+                        else { false }
                      }
-                     else if play_area_delta.x > 0 && facing_delta.x > 0 ||
-                        play_area_delta.x < 0 && facing_delta.x < 0 ||
-                        play_area_delta.y > 0 && facing_delta.y > 0 ||
-                        play_area_delta.y < 0 && facing_delta.y < 0 {
-                        snake.grow_cw();
+                     else if let Some(direction) = input {
+                        // Allow the player to steer.
+                        if direction == cw { snake.grow_cw().is_ok() }
+                        else if direction == ccw { snake.grow_ccw().is_ok() }
+                        else { false }
                      }
-                     else {
-                        snake.grow_forward();
-                     }
-                  }
-                  else if snake.player_index != player_index {
-                     // Turn randomly to simulate player input.
-                     const CHANCE_TO_TURN : f32 = 0.1;
-                     if f32::gen_range(0.0, 1.0) <= CHANCE_TO_TURN {
-                        if u8::gen_range(0, 2) == 0 { snake.grow_cw(); }
-                        else { snake.grow_ccw(); }
-                     }
-                     else {
-                        snake.grow_forward();
-                     }
-                  }
-                  else if let Some(direction) = input {
-                     // Allow the player to steer.
-                     if direction == cw { snake.grow_cw(); }
-                     else if direction == ccw { snake.grow_ccw(); }
-                     else { snake.grow_forward(); }
-                  }
-                  else {
-                     snake.grow_forward();
+                     else { false };
+                  
+                  if !turned && snake.grow_forward().is_err() {
+                     // Snake can't turn or grow forward, so it is dead.
+                     snake.alive = false;
                   }
 
-                  assert_ne!(prev_head_tile, snake.head_tile());
+                  assert!(prev_head_tile != snake.head_tile() || !snake.alive, "Live Snakes should always move forward each turn");
 
                   if snake.len() >= snake.target_len() {
                      // Unless we are growing, shrink the tail of the Snake during movement.

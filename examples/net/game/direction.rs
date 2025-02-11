@@ -47,14 +47,6 @@ impl Direction {
          Self::South => i16vec2(0, 1),
       }
    }
-
-   pub const fn is_horizontal(&self) -> bool {
-      self.delta().y == 0
-   }
-
-   pub const fn is_vertical(&self) -> bool {
-      self.delta().x == 0
-   }
 }
 
 impl Add<Direction> for I16Vec2 {
@@ -121,22 +113,6 @@ mod tests {
       assert_eq!(East.delta(), i16vec2(1, 0));
       assert_eq!(North.delta(), i16vec2(0, -1));
       assert_eq!(South.delta(), i16vec2(0, 1));
-   }
-
-   #[test]
-   fn test_direction_is_horizontal() {
-      assert_eq!(West.is_horizontal(), true);
-      assert_eq!(East.is_horizontal(), true);
-      assert_eq!(North.is_horizontal(), false);
-      assert_eq!(South.is_horizontal(), false);
-   }
-
-   #[test]
-   fn test_direction_is_vertical() {
-      assert_eq!(West.is_vertical(), false);
-      assert_eq!(East.is_vertical(), false);
-      assert_eq!(North.is_vertical(), true);
-      assert_eq!(South.is_vertical(), true);
    }
 
    #[test]
