@@ -25,6 +25,14 @@ impl Segment {
       let end = corner.offset(self.direction, self.len.get() as i16);
       (start, end)
    }
+
+   /// Splits the [`Segment`] into two at the given offset.
+   pub fn split_at(self, at : NonZeroU8) -> (Option<Segment>, Option<Segment>) {
+      assert!(at <= self.len, "Offset {at} is out of bounds of Segment (length: {})", self.len);
+      let front = (self.direction, at.get().saturating_sub(1)).try_into().ok();
+      let back = (self.direction, self.len.get().saturating_sub(at.get())).try_into().ok();
+      (front, back)
+   }
 }
 
 impl TryFrom<(Direction, u8)> for Segment {
@@ -138,21 +146,11 @@ impl Snake {
    }
 
    pub fn shrink_tail(mut self) -> Option<Self> {
-      let last_segment = self.segments.back()?;
-      let new_segment_len = last_segment.len.get().saturating_sub(1);
-
-      if new_segment_len > 0 {
-         // Shorten the existing Segment.
-         let last_segment_mut = self.segments.back_mut().unwrap();
-         last_segment_mut.len = new_segment_len.try_into().unwrap();
-         self.prev_tail_dir = Some(last_segment_mut.direction);
-      }
-      else {
-         // We're at a corner, so the Segment needs to completely disappear.
-         let last_segment = self.segments.pop_back().unwrap();
-         self.prev_tail_dir = Some(last_segment.direction);
-      }
-
+      let last_segment = self.segments.pop_back()?;
+      let (front, back) = last_segment.split_at(last_segment.len);
+      assert!(back.is_none(), "Expected to remove only last tile");
+      self.prev_tail_dir = Some(last_segment.direction);
+      self.segments.extend(front);
       Some(self)
    }
 
@@ -288,6 +286,28 @@ mod tests {
    fn test_segment_facing() {
       let segment = Segment::with_facing(Direction::North);
       assert_eq!(segment.facing(), Direction::North);
+   }
+
+   #[test]
+   fn test_segment_split() {
+      let mut i = 0;
+
+      let mut run_test = |start_len: u8, split_at: u8, (front, back): (Option<u8>, Option<u8>)| {
+         i += 1;
+         
+         let segment : Segment = (Direction::West, start_len).try_into().unwrap();
+         let actual = segment.split_at(split_at.try_into().unwrap());
+         let make_segment = |maybe_len : Option<u8>| {
+            maybe_len.and_then(|len| (segment.direction, len).try_into().ok())
+         };
+         let expected = (make_segment(front), make_segment(back));
+         assert_eq!(expected, actual, "At iteration {i}, expected Segments to match");
+      };
+
+      run_test(1, 1, (None, None));
+      run_test(2, 1, (None, Some(1)));
+      run_test(2, 2, (Some(1), None));
+      run_test(3, 2, (Some(1), Some(1)));
    }
 
    const SOME_PLAYER_INDEX : usize = 1;
