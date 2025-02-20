@@ -154,6 +154,35 @@ impl Snake {
       Some(self)
    }
 
+   /// Splits the [`Snake`] at the specified [`Segment`] and offset and returns the tail as a new [`Snake`].
+   #[cfg(test)]
+   pub fn split_off(&mut self, segment_index : usize, offset : NonZeroU8) -> Snake {
+      let (back_corner, back_segment) = self.segments().nth(segment_index).expect("Segment index out of bounds");
+      let back_head_tile = back_corner.offset(back_segment.direction, offset.get() as i16);
+
+      // Cut off the tail of the Snake, keeping track of the middle Segment that we need to split.
+      let mut back_segments = self.segments.split_off(segment_index);
+      let segment_to_split = back_segments.pop_front().expect("Expected a Segment to split");
+
+      // Split the middle Segment at the offset and divvy it up between the two Snakes.
+      let (segment_front, segment_back) = segment_to_split.split_at(offset);
+      if let Some(segment) = segment_front { self.segments.push_back(segment); }
+      if let Some(segment) = segment_back { back_segments.push_front(segment); }
+
+      let back_snake = Snake {
+         alive: false,
+         head_tile: back_head_tile,
+         prev_tail_dir: self.prev_tail_dir,
+         segments: back_segments,
+         ..*self
+      };
+
+      self.prev_tail_dir = if self.segments.len() == 0 { Some(segment_to_split.direction) } else { None };
+      self.amt_to_grow = 0;
+
+      back_snake
+   }
+
    pub fn can_decap(&self, other : &Snake) -> bool {
       // Both Snakes must be alive and this Snake must be longer.
       self.alive && other.alive && other.len() <= self.len()
@@ -225,6 +254,20 @@ impl Snake {
    }
 }
 
+impl PartialEq for Snake {
+   fn eq(&self, other: &Self) -> bool {
+      self.player_index == other.player_index &&
+      self.alive == other.alive &&
+      self.head_tile == other.head_tile &&
+      self.segments == other.segments &&
+      self.prev_tail_dir == other.prev_tail_dir &&
+      self.amt_to_grow == other.amt_to_grow &&
+      self.color == other.color
+   }
+}
+
+impl Eq for Snake { }
+
 /// An iterator over the [`Segment`s](Segment) of a [`Snake`]. Also outputs an [`I16Vec2`] representing the **corner**
 /// to which the [`Segment`] is attached, i.e the end tile of the previous [`Segment`].
 #[derive(Debug)]
@@ -264,28 +307,29 @@ pub struct Overlap {
 #[cfg(test)]
 mod tests {
    use super::*;
+   use Direction::*;
 
    #[test]
    fn test_segment_from_tuple() {
-      let segment : Segment = (Direction::East, 8).try_into().expect("Failed to create Segment");
-      assert_eq!(segment, Segment { direction: Direction::East, len: NonZeroU8::new(8).unwrap() });
+      let segment : Segment = (East, 8).try_into().expect("Failed to create Segment");
+      assert_eq!(segment, Segment { direction: East, len: NonZeroU8::new(8).unwrap() });
    }
    
    #[test]
    fn test_segment_from_tuple_zero_length() {
-      Segment::try_from((Direction::East, 0)).expect_err("Length must be non-zero");
+      Segment::try_from((East, 0)).expect_err("Length must be non-zero");
    }
 
    #[test]
    fn test_segment_with_facing() {
-      let segment = Segment::with_facing(Direction::North);
-      assert_eq!(segment, Segment { direction: Direction::South, len: NonZeroU8::MIN });
+      let segment = Segment::with_facing(North);
+      assert_eq!(segment, Segment { direction: South, len: NonZeroU8::MIN });
    }
 
    #[test]
    fn test_segment_facing() {
-      let segment = Segment::with_facing(Direction::North);
-      assert_eq!(segment.facing(), Direction::North);
+      let segment = Segment::with_facing(North);
+      assert_eq!(segment.facing(), North);
    }
 
    #[test]
@@ -311,10 +355,10 @@ mod tests {
    }
 
    const SOME_PLAYER_INDEX : usize = 1;
-   fn make_spawn_params(len : u16) -> SpawnParams {
+   fn make_spawn_params(head_tile_pos : I16Vec2, len : u16) -> SpawnParams {
       SpawnParams {
          alive: true,
-         head_tile_pos: i16vec2(2, -3),
+         head_tile_pos,
          color: BEIGE,
          len,
          ..Default::default()
@@ -323,13 +367,13 @@ mod tests {
 
    #[test]
    fn test_snake_spawn() {
-      let params = make_spawn_params(12); // NOTE: Target length is LONGER than Snake length
+      let params = make_spawn_params(i16vec2(2, -3), 12); // NOTE: Target length is LONGER than Snake length
 
       let segments = vec![
-         (Direction::West, 3),
-         (Direction::South, 2),
-         (Direction::East, 4),
-         (Direction::North, 1),
+         (West, 3),
+         (South, 2),
+         (East, 4),
+         (North, 1),
       ];
 
       let snake = Snake::try_spawn_with_segments(SOME_PLAYER_INDEX, params, segments)
@@ -340,10 +384,10 @@ mod tests {
       assert_eq!(snake.amt_to_grow, 1);
 
       const EXPECTED_SEGMENTS : [(I16Vec2, (Direction, u8)); 4] = [
-         (i16vec2(2, -3), (Direction::West, 3)),
-         (i16vec2(-1, -3), (Direction::South, 2)),
-         (i16vec2(-1, -1), (Direction::East, 4)),
-         (i16vec2(3, -1), (Direction::North, 1)),
+         (i16vec2( 2, -3), (West,  3)),
+         (i16vec2(-1, -3), (South, 2)),
+         (i16vec2(-1, -1), (East,  4)),
+         (i16vec2( 3, -1), (North, 1)),
       ];
       
       for (index, ((tiles, segment), (expected_tiles, expected_segment))) in snake.segments().zip(EXPECTED_SEGMENTS.iter()).enumerate() {
@@ -356,18 +400,113 @@ mod tests {
 
    #[test]
    fn test_invalid_spawn() {
-      let params = make_spawn_params(9);
+      let params = make_spawn_params(I16Vec2::ZERO, 9);
 
       let segments = vec![
-         (Direction::North, 2),
-         (Direction::West,  2),
-         (Direction::South, 2),
-         (Direction::East,  2), // Overlaps with head!
+         (North, 2),
+         (West,  2),
+         (South, 2),
+         (East,  2), // Overlaps with head!
       ];
 
       let overlap = Snake::try_spawn_with_segments(SOME_PLAYER_INDEX, params, segments)
          .expect_err("Expected error when trying to spawn Snake");
 
       assert_eq!(overlap, Overlap { segment_index: 3, offset: 2 });
+   }
+
+   struct SplitTestData {
+      segment_index : usize,
+      offset : u8,
+      expected_front : SnakeTestData,
+      expected_back : SnakeTestData,
+   }
+
+   struct SnakeTestData {
+      head_tile : I16Vec2,
+      segments : Vec<(Direction, u8)>,
+      prev_tail_dir : Option<Direction>,
+   }
+
+   impl SnakeTestData {
+      pub fn into_snake(self, snake_to_clone : &Snake, alive : bool) -> Snake {
+         let segments : Vec<Segment> = self.segments.iter()
+            .copied()
+            .map(|tuple : (Direction, u8)| -> Segment {
+               tuple.try_into().expect("Expected Segment to have non-zero length")
+            })
+            .collect();
+
+         let mut snake = Snake::try_spawn_with_segments(
+            snake_to_clone.player_index,
+            SpawnParams {
+               head_tile_pos: self.head_tile,
+               alive,
+               len: Snake::measure(segments.iter()).get(),
+               color: snake_to_clone.color,
+            },
+            self.segments)
+            .expect("Expected Snake to spawn correctly");
+
+         snake.prev_tail_dir = self.prev_tail_dir;
+         snake
+      }
+   }
+
+   #[test]
+   fn test_split() {
+      let params = make_spawn_params(I16Vec2::ZERO, 5);
+      let segments = vec![
+         (West, 2),
+         (South, 2),
+      ];
+
+      let snake_to_split = {
+         let mut snake = Snake::try_spawn_with_segments(SOME_PLAYER_INDEX, params, segments)
+            .expect("Expected Snake to spawn successfully");
+         snake.prev_tail_dir = Some(East);
+         snake
+      };
+
+      let mut i : usize = 0;
+      let mut test_split = |test : SplitTestData| {
+         i += 1;
+
+         let mut front = snake_to_split.clone();
+         let back = front.split_off(
+            test.segment_index,
+            test.offset.try_into().expect("Expected non-zero offset"));
+
+         let expected_front_snake = test.expected_front.into_snake(&snake_to_split, true);
+         let expected_back_snake = test.expected_back.into_snake(&snake_to_split, false);
+
+         assert_eq!(front, expected_front_snake, "At iteration {i}, expected front of Snake to match");
+         assert_eq!(back, expected_back_snake, "At iteration {i}, expected back of Snake to match");
+      };
+      
+      test_split(SplitTestData {
+         segment_index: 0,
+         offset: 1,
+         expected_front: SnakeTestData { head_tile: i16vec2(0, 0), segments: vec![], prev_tail_dir: Some(West) },
+         expected_back: SnakeTestData { head_tile: i16vec2(-1, 0), segments: vec![(West, 1), (South, 2)], prev_tail_dir: Some(East) },
+      });
+      test_split(SplitTestData {
+         segment_index: 0,
+         offset: 2,
+         expected_front: SnakeTestData { head_tile: i16vec2(0, 0), segments: vec![(West, 1)], prev_tail_dir: None },
+         expected_back: SnakeTestData { head_tile: i16vec2(-2, 0), segments: vec![(South, 2)], prev_tail_dir: Some(East) },
+      });
+      test_split(SplitTestData {
+         segment_index: 1,
+         offset: 1,
+         expected_front: SnakeTestData { head_tile: i16vec2(0, 0), segments: vec![(West, 2)], prev_tail_dir: None, },
+         expected_back: SnakeTestData { head_tile: i16vec2(-2, 1), segments: vec![(South, 1)], prev_tail_dir: Some(East) },
+      });
+      test_split(SplitTestData {
+         segment_index: 1,
+         offset: 2,
+         expected_front: SnakeTestData { head_tile: i16vec2(0, 0), segments: vec![(West, 2), (South, 1)], prev_tail_dir: None },
+         expected_back: SnakeTestData { head_tile: i16vec2(-2, 2), segments: vec![], prev_tail_dir: Some(East) },
+      });
    }
 }
