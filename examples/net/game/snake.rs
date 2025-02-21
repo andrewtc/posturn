@@ -151,7 +151,6 @@ impl Snake {
    }
 
    /// Splits the [`Snake`] at the specified [`Segment`] and offset and returns the tail as a new [`Snake`].
-   #[cfg(test)]
    pub fn split_off(&mut self, segment_index : usize, offset : NonZeroU8) -> Snake {
       let (back_corner, back_segment) = self.segments().nth(segment_index).expect("Segment index out of bounds");
       let back_head_tile = back_corner.offset(back_segment.direction, offset.get() as i16);
@@ -196,7 +195,7 @@ impl Snake {
 
          if let Some(offset) = offset {
             if offset > 0 && offset <= segment.len.get() {
-               let overlap = Overlap { segment_index, offset };
+               let overlap = Overlap { segment_index, offset: offset.try_into().unwrap() };
                return Some(overlap.into());
             }
          }
@@ -297,5 +296,5 @@ pub struct Overlap {
 
    /// Where the tile overlaps, measured in whole tiles from the **corner** to which the [`Segment`] is attached, i.e.
    /// the end tile of the previous [`Segment`].
-   pub offset : u8,
+   pub offset : NonZeroU8,
 }

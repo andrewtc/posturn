@@ -110,7 +110,7 @@ mod snake {
       let overlap = Snake::try_spawn(SOME_PLAYER_INDEX, params)
          .expect_err("Expected error when trying to spawn Snake");
 
-      assert_eq!(overlap, Overlap { segment_index: 3, offset: 2 });
+      assert_eq!(overlap, Overlap { segment_index: 3, offset: 2.try_into().unwrap() });
    }
 
    struct SplitTestData {
