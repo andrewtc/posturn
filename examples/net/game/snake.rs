@@ -46,12 +46,14 @@ impl TryFrom<(Direction, u8)> for Segment {
    }
 }
 
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct SpawnParams {
    pub alive : bool,
-   pub head_tile_pos : I16Vec2,
-   pub len : u16,
+   pub head_tile : I16Vec2,
+   pub amt_to_grow : u16,
    pub color : Color,
+   pub segments : Vec<(Direction, u8)>,
+   pub prev_tail_dir : Option<Direction>,
 }
 
 #[derive(Clone, Debug)]
@@ -66,27 +68,18 @@ pub struct Snake {
 }
 
 impl Snake {
-   pub fn spawn(player_index : usize, params : SpawnParams) -> Self {
-      Self::try_spawn_with_segments(player_index, params, None).expect("Expected no Segment overlap")
-   }
-   
-   pub fn try_spawn_with_segments<I>(player_index : usize, params : SpawnParams, segments : I) -> Result<Self, Overlap> where
-      I : IntoIterator<Item = (Direction, u8)>,
-   {
-      let segments : VecDeque<Segment> = segments.into_iter()
+   pub fn try_spawn(player_index : usize, params : SpawnParams) -> Result<Snake, Overlap> {
+      let segments : VecDeque<Segment> = params.segments.into_iter()
          .map(|raw_parts| raw_parts.try_into().expect("Length cannot be zero"))
          .collect();
-
-      let len = Self::measure(segments.iter());
-      let amt_to_grow = params.len.checked_sub(len.get()).expect("Snake is already longer than target length");
 
       let snake = Self {
          player_index,
          alive: params.alive,
-         head_tile: params.head_tile_pos,
+         head_tile: params.head_tile,
          segments,
-         prev_tail_dir: None,
-         amt_to_grow,
+         prev_tail_dir: params.prev_tail_dir,
+         amt_to_grow: params.amt_to_grow,
          color: params.color,
       };
 

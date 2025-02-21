@@ -21,44 +21,53 @@ async fn main() {
    let snakes = [
       SpawnParams {
          alive: true,
-         head_tile_pos: i16vec2(-19, -13),
-         len: 16,
+         head_tile: i16vec2(-19, -13),
+         amt_to_grow: 16,
          color: GREEN,
+         ..Default::default()
       },
       SpawnParams {
          alive: true,
-         head_tile_pos: i16vec2(10, -5),
-         len: 11,
+         head_tile: i16vec2(10, -5),
+         amt_to_grow: 11,
          color: BLUE,
+         ..Default::default()
       },
       SpawnParams {
          alive: true,
-         head_tile_pos: i16vec2(5, 10),
-         len: 12,
+         head_tile: i16vec2(5, 10),
+         amt_to_grow: 12,
          color: PURPLE,
+         ..Default::default()
       },
       SpawnParams {
          alive: true,
-         head_tile_pos: i16vec2(-9, -5),
-         len: 14,
+         head_tile: i16vec2(-9, -5),
+         amt_to_grow: 14,
          color: RED,
+         ..Default::default()
       },
       SpawnParams {
          alive: true,
-         head_tile_pos: i16vec2(20, 15),
-         len: 13,
+         head_tile: i16vec2(20, 15),
+         amt_to_grow: 13,
          color: YELLOW,
+         ..Default::default()
       },
       SpawnParams {
          alive: true,
-         head_tile_pos: i16vec2(-3, -3),
-         len: 15,
+         head_tile: i16vec2(-3, -3),
+         amt_to_grow: 15,
          color: ORANGE,
+         ..Default::default()
       },
    ]
    .into_iter()
    .enumerate()
-   .map(|(player_index, params)| Snake::spawn(player_index, params))
+   .map(|(player_index, params)| {
+      Snake::try_spawn(player_index, params)
+         .expect(&format!("Spawn parameters for player {player_index}'s Snake were invalid"))
+   })
    .collect();
 
    let host = posturn::Host::new(Game {
