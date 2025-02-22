@@ -142,17 +142,15 @@ impl Snake {
    }
 
    pub fn try_grow_backward(&mut self) -> bool {
-      if self.amt_to_grow > 0 {
-         self.amt_to_grow = self.amt_to_grow.saturating_sub(1);
+      if self.amt_to_grow == 0 { return false; }
+      self.amt_to_grow = self.amt_to_grow.saturating_sub(1);
 
-         if self.segments.len() > 0 {
-            // Clear the previous tail direction, since we're growing. (Can't do this if we're just a head.)
-            self.prev_tail_dir = None;
-         }
-
-         true
+      if self.segments.len() > 0 {
+         // Clear the previous tail direction, since we're growing. (Can't do this if we're just a head.)
+         self.prev_tail_dir = None;
       }
-      else { false }
+
+      true
    }
 
    pub fn lengthen(&mut self, amt_to_grow : u16) {
