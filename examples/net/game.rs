@@ -114,12 +114,8 @@ impl Game {
          else {
             assert!(prev_head_tile != snake.head_tile() || !snake.alive, "Live Snakes should always move forward each turn");
 
-            if snake.is_growing() {
-               // Snake is growing, so it doesn't shrink this turn.
-               snake.amt_to_grow -= 1;
-            }
-            else {
-               // Shrink the tail of the Snake after moving, to keep it the same size.
+            if !snake.try_grow_backward() {
+               // Unless we grew this turn, shrink the tail of the Snake after moving to keep it the same size.
                snake = snake.shrink_tail().unwrap();
                assert_eq!(snake.len(), old_len, "The snake should always stay the same length");
             }
@@ -194,7 +190,7 @@ impl Game {
          if !snake.alive { continue; }
          else if let Some(points) = temp_points_by_player.get(&snake.player_index) {
             // Add length to each Snake based on the number of points accumulated.
-            snake.amt_to_grow = snake.amt_to_grow.saturating_add(*points);
+            snake.lengthen(*points);
          }
       }
 

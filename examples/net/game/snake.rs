@@ -62,7 +62,7 @@ pub struct Snake {
    pub alive : bool,
    head_tile : I16Vec2,
    segments : VecDeque<Segment>,
-   pub amt_to_grow : u16,
+   amt_to_grow : u16,
    prev_tail_dir : Option<Direction>,
    pub color : Color,
 }
@@ -139,6 +139,24 @@ impl Snake {
       self.segments.push_front(Segment::with_facing(ccw));
 
       Ok(())
+   }
+
+   pub fn try_grow_backward(&mut self) -> bool {
+      if self.amt_to_grow > 0 {
+         self.amt_to_grow = self.amt_to_grow.saturating_sub(1);
+
+         if self.segments.len() > 0 {
+            // Clear the previous tail direction, since we're growing. (Can't do this if we're just a head.)
+            self.prev_tail_dir = None;
+         }
+
+         true
+      }
+      else { false }
+   }
+
+   pub fn lengthen(&mut self, amt_to_grow : u16) {
+      self.amt_to_grow = self.amt_to_grow.saturating_add(amt_to_grow);
    }
 
    pub fn shrink_head(mut self) -> Option<Self> {
@@ -244,10 +262,6 @@ impl Snake {
          .map(|segment| segment.facing())
          .or_else(|| self.prev_tail_dir.map(|dir| dir.opposite()))
          .unwrap_or_default()
-   }
-
-   pub fn is_growing(&self) -> bool {
-      self.amt_to_grow > 0
    }
 
    pub fn measure<'i, I>(segments : I) -> NonZeroU16 where
