@@ -141,6 +141,22 @@ impl Snake {
       Ok(())
    }
 
+   pub fn shrink_head(mut self) -> Option<Self> {
+      // If it had a head, now it doesn't.
+      self.alive = false;
+
+      let head_segment = self.segments.pop_front()?;
+      let (front, back) = head_segment.split_at(NonZeroU8::MIN);
+      assert!(front.is_none(), "Expected to remove only head of Snake");
+
+      if let Some(segment) = back {
+         self.segments.push_front(segment);
+      }
+
+      self.head_tile = self.head_tile + head_segment.direction;
+      Some(self)
+   }
+
    pub fn shrink_tail(mut self) -> Option<Self> {
       let last_segment = self.segments.pop_back()?;
       let (front, back) = last_segment.split_at(last_segment.len);
@@ -152,7 +168,10 @@ impl Snake {
 
    /// Splits the [`Snake`] at the specified [`Segment`] and offset and returns the tail as a new [`Snake`].
    pub fn split_off(&mut self, segment_index : usize, offset : NonZeroU8) -> Snake {
-      let (back_corner, back_segment) = self.segments().nth(segment_index).expect("Segment index out of bounds");
+      let (back_corner, back_segment) = self.segments()
+         .nth(segment_index)
+         .expect(&format!("Segment index {segment_index} is out of bounds (count: {})", self.segments.len()));
+
       let back_head_tile = back_corner.offset(back_segment.direction, offset.get() as i16);
 
       // Cut off the tail of the Snake, keeping track of the middle Segment that we need to split.
@@ -180,7 +199,7 @@ impl Snake {
 
    pub fn can_decap(&self, other : &Snake) -> bool {
       // Both Snakes must be alive and this Snake must be longer.
-      self.alive && other.alive && other.len() <= self.len()
+      !other.alive || (self.alive && other.len() <= self.len())
    }
 
    pub fn find_body_overlap(&self, tile : I16Vec2) -> Option<Overlap> {

@@ -134,36 +134,44 @@ impl Game {
    fn handle_post_collisions(&mut self, temp_snakes : &mut Vec<Snake>, temp_overlaps : &mut BinaryHeap<Reverse<Overlap>>) {
       temp_snakes.clear();
 
-      for snake_to_eat in self.snakes.iter() {
+      for (snake_to_eat_index, snake_to_eat) in self.snakes.iter().enumerate() {
          temp_overlaps.clear();
 
-         for overlapping_snake in self.snakes.iter() {
-            if !overlapping_snake.alive || snake_to_eat.player_index == overlapping_snake.player_index {
+         let mut decap = false;
+         for (overlapping_snake_index, overlapping_snake) in self.snakes.iter().enumerate() {
+            if snake_to_eat_index == overlapping_snake_index || !overlapping_snake.alive {
                continue;
             }
 
-            if let Some(overlap) = snake_to_eat.find_body_overlap(overlapping_snake.head_tile()) {
+            if overlapping_snake.head_tile() == snake_to_eat.head_tile() && overlapping_snake.can_decap(snake_to_eat)
+            {
+               decap = true;
+            }
+            else if let Some(overlap) = snake_to_eat.find_body_overlap(overlapping_snake.head_tile()) {
                // Keep track of overlaps in reverse order, i.e. pop the smallest value first.
                temp_overlaps.push(Reverse(overlap));
             }
          }
 
-         if temp_overlaps.is_empty() {
+         if !decap && temp_overlaps.is_empty() {
             temp_snakes.push(snake_to_eat.clone());
             continue;
          }
 
-         let mut snake_to_eat = Some(snake_to_eat.clone());
+         // Remove the head, if necessary.
+         let mut snake_to_eat =
+            if decap { snake_to_eat.clone().shrink_head() }
+            else { Some(snake_to_eat.clone()) };
+
          while let Some(Reverse(overlap)) = temp_overlaps.pop() {
             // Split each Snake that overlaps with another Snake into separate Snakes and place them on the board.
-            let mut head_minus_tail = snake_to_eat.take().expect("Expected tail to split");
+            let mut head_minus_tail = snake_to_eat.take().expect("Expected a tail to split");
             let tail = head_minus_tail.split_off(overlap.segment_index, overlap.offset);
             
-            temp_snakes.push(head_minus_tail);
-            
             // Chomp the front of the tail as we add it back to the board.
-            // TODO: snake_to_eat = tail.shrink_head();
-            snake_to_eat = Some(tail);
+            temp_snakes.extend(tail.shrink_head());
+
+            snake_to_eat = Some(head_minus_tail);
          }
 
          temp_snakes.extend(snake_to_eat);
