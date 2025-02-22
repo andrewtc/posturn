@@ -1,6 +1,6 @@
 use std::num::NonZeroU16;
 
-use macroquad::prelude::*;
+use macroquad::{color, prelude::*};
 
 use crate::game::{direction::Direction, snake::Snake};
 
@@ -63,7 +63,20 @@ pub fn draw_snake(snake : &Snake, turn_progress : f32, color_override : Option<C
 
    let mut last_segment_end_tile = head_tile;
    let mut last_segment_end_pos = head_screen_pos;
-   let color = color_override.unwrap_or(snake.color);
+   let mut color = color_override.unwrap_or(snake.color);
+
+   if !snake.alive {
+      // Make dead Snakes render in more muted colors.
+      let (hue, mut saturation, mut luminosity) = color::rgb_to_hsl(color);
+      
+      const SATURATION_SHIFT : f32 = 0.1;
+      saturation = (saturation - SATURATION_SHIFT).max(0.0);
+      
+      const LUMINOSITY_SHIFT : f32 = 0.1;
+      luminosity = (luminosity - LUMINOSITY_SHIFT).max(0.0);
+
+      color = color::hsl_to_rgb(hue, saturation, luminosity);
+   }
 
    for (corner, segment) in snake.segments() {
       let (_, end) = segment.endpoints(corner);
