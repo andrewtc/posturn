@@ -1,7 +1,7 @@
 pub mod direction;
 pub mod snake;
 
-use std::{cmp::Reverse, collections::BinaryHeap, mem::swap};
+use std::{cmp::Reverse, collections::{BTreeMap, BinaryHeap}, mem::swap};
 
 use macroquad::{math::{I16Vec2, U16Vec2}, rand::{srand, RandomRange}};
 use posturn::Play;
@@ -131,8 +131,14 @@ impl Game {
       swap(&mut self.snakes, temp_snakes);
    }
 
-   fn handle_post_collisions(&mut self, temp_snakes : &mut Vec<Snake>, temp_overlaps : &mut BinaryHeap<Reverse<Overlap>>) {
+   fn handle_post_collisions(
+      &mut self,
+      temp_snakes : &mut Vec<Snake>,
+      temp_overlaps : &mut BinaryHeap<Reverse<Overlap>>,
+      temp_points_by_player : &mut BTreeMap<usize, u16>)
+   {
       temp_snakes.clear();
+      temp_points_by_player.clear();
 
       for (snake_to_eat_index, snake_to_eat) in self.snakes.iter().enumerate() {
          temp_overlaps.clear();
@@ -143,13 +149,20 @@ impl Game {
                continue;
             }
 
+            let points = temp_points_by_player.entry(overlapping_snake.player_index);
+            let add_point = || {
+               points.and_modify(|value| *value = value.saturating_add(1)).or_insert(1)
+            };
+
             if overlapping_snake.head_tile() == snake_to_eat.head_tile() && overlapping_snake.can_decap(snake_to_eat)
             {
                decap = true;
+               add_point();
             }
             else if let Some(overlap) = snake_to_eat.find_body_overlap(overlapping_snake.head_tile()) {
                // Keep track of overlaps in reverse order, i.e. pop the smallest value first.
                temp_overlaps.push(Reverse(overlap));
+               add_point();
             }
          }
 
@@ -177,6 +190,14 @@ impl Game {
          temp_snakes.extend(snake_to_eat);
       }
 
+      for snake in temp_snakes.iter_mut() {
+         if !snake.alive { continue; }
+         else if let Some(points) = temp_points_by_player.get(&snake.player_index) {
+            // Add length to each Snake based on the number of points accumulated.
+            snake.amt_to_grow = snake.amt_to_grow.saturating_add(*points);
+         }
+      }
+
       swap(&mut self.snakes, temp_snakes);
    }
 }
@@ -192,6 +213,7 @@ impl Play for Game {
 
          let mut temp_snakes = vec![];
          let mut temp_overlaps = BinaryHeap::new();
+         let mut temp_points_by_player = BTreeMap::new();
 
          loop {
             let input = ctx.yield_event(WaitForInput).await;
@@ -199,7 +221,7 @@ impl Play for Game {
             ctx.host.with_game_mut(|mut game| {
                game.handle_pre_collisions(&mut temp_snakes);
                game.handle_movement(input, &mut temp_snakes);
-               game.handle_post_collisions(&mut temp_snakes, &mut temp_overlaps);
+               game.handle_post_collisions(&mut temp_snakes, &mut temp_overlaps, &mut temp_points_by_player);
             });
          }
       }

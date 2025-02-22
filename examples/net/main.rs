@@ -22,42 +22,42 @@ async fn main() {
       SpawnParams {
          alive: true,
          head_tile: i16vec2(-19, -13),
-         amt_to_grow: 16,
+         amt_to_grow: 5,
          color: GREEN,
          ..Default::default()
       },
       SpawnParams {
          alive: true,
          head_tile: i16vec2(10, -5),
-         amt_to_grow: 11,
+         amt_to_grow: 5,
          color: BLUE,
          ..Default::default()
       },
       SpawnParams {
          alive: true,
          head_tile: i16vec2(5, 10),
-         amt_to_grow: 12,
+         amt_to_grow: 5,
          color: PURPLE,
          ..Default::default()
       },
       SpawnParams {
          alive: true,
          head_tile: i16vec2(-9, -5),
-         amt_to_grow: 14,
+         amt_to_grow: 5,
          color: RED,
          ..Default::default()
       },
       SpawnParams {
          alive: true,
          head_tile: i16vec2(20, 15),
-         amt_to_grow: 13,
+         amt_to_grow: 5,
          color: YELLOW,
          ..Default::default()
       },
       SpawnParams {
          alive: true,
          head_tile: i16vec2(-3, -3),
-         amt_to_grow: 15,
+         amt_to_grow: 5,
          color: ORANGE,
          ..Default::default()
       },
