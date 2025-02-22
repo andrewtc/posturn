@@ -5,9 +5,22 @@ use std::time::Duration;
 
 use futures::pin_mut;
 use game::{Game, direction::Direction, snake::{Snake, SpawnParams}};
-use genawaiter::Coroutine;
+use genawaiter::{Coroutine, GeneratorState};
 use macroquad::{prelude::*, time};
 use miniquad::window::{screen_size, set_window_size};
+
+/// The state of the game window.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum GameState {
+   /// Show the paused overlay.
+   Paused,
+
+   /// Let players play the game.
+   InProgress,
+
+   /// Show the "Game Over!" overlay and allow players to restart the game.
+   GameOver,
+}
 
 #[macroquad::main("Out West!")]
 async fn main() {
@@ -18,7 +31,7 @@ async fn main() {
    const PLAY_AREA_HALF_EXTENTS : U16Vec2 = u16vec2(20, 15);
    const RANDOM_SEED : u64 = 12345;
 
-   let snakes = [
+   let spawn_params = [
       SpawnParams {
          alive: true,
          head_tile: i16vec2(-19, -13),
@@ -61,96 +74,113 @@ async fn main() {
          color: ORANGE,
          ..Default::default()
       },
-   ]
-   .into_iter()
-   .enumerate()
-   .map(|(player_index, params)| {
-      Snake::try_spawn(player_index, params)
-         .expect(&format!("Spawn parameters for player {player_index}'s Snake were invalid"))
-   })
-   .collect();
-
-   let host = posturn::Host::new(Game {
-      player_index: 3,
-      play_area_half_extents: PLAY_AREA_HALF_EXTENTS,
-      random_seed: RANDOM_SEED,
-      snakes,
-   });
-
-   let co = host.play().unwrap();
-   pin_mut!(co);
-
-   co.as_mut().resume_with(None);
-
-   let mut paused = true;
-
-   const TURN_DURATION : Duration = Duration::from_millis(100);
-   let mut time_until_next_turn = Duration::ZERO;
+   ];
 
    loop {
-      const KEY_PAUSE : KeyCode = KeyCode::Space;
-      if is_key_pressed(KEY_PAUSE) {
-         paused = !paused;
-      }
+      let snakes = spawn_params.clone()
+         .into_iter()
+         .enumerate()
+         .map(|(player_index, params)| {
+            Snake::try_spawn(player_index, params)
+               .expect(&format!("Spawn parameters for player {player_index}'s Snake were invalid"))
+         })
+         .collect();
 
-      let input = 
-         if is_key_down(KeyCode::Left) { Some(Direction::West) }
-         else if is_key_down(KeyCode::Right) { Some(Direction::East) }
-         else if is_key_down(KeyCode::Up) { Some(Direction::North) }
-         else if is_key_down(KeyCode::Down) { Some(Direction::South) }
-         else { None };
-
-      if !paused {
-         let time_elapsed = Duration::from_secs_f32(time::get_frame_time());
-         let mut should_take_turn = false;
-
-         time_until_next_turn = time_until_next_turn
-            .checked_sub(time_elapsed)
-            .unwrap_or_else(|| {
-               should_take_turn = true;
-               TURN_DURATION - (time_elapsed - time_until_next_turn).min(TURN_DURATION)
-            });
-
-         if should_take_turn {
-            co.as_mut().resume_with(input);
-         }
-      }
-
-      const BG_COLOR : Color = Color::new(0.73, 0.4, 0.17, 1f32);
-      clear_background(BG_COLOR);
-
-      let turn_progress = 1f32 - time_until_next_turn.div_duration_f32(TURN_DURATION);
-      host.with_game(|game| {
-         for snake in game.snakes.iter() {
-            draw::draw_snake(snake, turn_progress, None);
-         }
+      let host = posturn::Host::new(Game {
+         player_index: 3,
+         play_area_half_extents: PLAY_AREA_HALF_EXTENTS,
+         random_seed: RANDOM_SEED,
+         snakes,
       });
 
-      if paused {
-         const TITLE_TEXT : &str = "Out West!";
-         let title_text_params = TextParams {
-            font: None,
-            font_size: 128,
-            color: WHITE,
-            ..Default::default()
-         };
-         
-         const PAUSED_TEXT : &str = "Press SPACE to pause or resume the game.";
-         let paused_text_params = TextParams {
-            font_size: 32,
-            ..title_text_params
-         };
+      let co = host.play().unwrap();
+      pin_mut!(co);
 
-         let screen_center = 0.5f32 * Vec2::from(screen_size());
-         let title_text_center = get_text_center(TITLE_TEXT, None, title_text_params.font_size, title_text_params.font_scale, title_text_params.rotation);
-         let title_text_pos = screen_center - title_text_center;
-         draw_text_ex(TITLE_TEXT, title_text_pos.x, title_text_pos.y, title_text_params);
+      // We want to see Snakes already spawned when we start the game.
+      co.as_mut().resume_with(None);
 
-         let paused_text_center = get_text_center(PAUSED_TEXT, None, paused_text_params.font_size, paused_text_params.font_scale, paused_text_params.rotation);
-         let paused_text_pos = (screen_center + Vec2{ x: 0.0, y: 64.0 }) - paused_text_center;
-         draw_text_ex(PAUSED_TEXT, paused_text_pos.x, paused_text_pos.y, paused_text_params);
+      // Start the game paused.
+      let mut game_state = GameState::Paused;
+
+      const TURN_DURATION : Duration = Duration::from_millis(100);
+      let mut time_until_next_turn = Duration::ZERO;
+
+      'new_game: loop {
+         const KEY_PAUSE : KeyCode = KeyCode::Space;
+         if is_key_pressed(KEY_PAUSE) {
+            game_state = match game_state {
+               GameState::Paused => GameState::InProgress,
+               GameState::InProgress => GameState::Paused,
+               GameState::GameOver => break 'new_game,
+            };
+         }
+
+         let input = 
+            if is_key_down(KeyCode::Left) { Some(Direction::West) }
+            else if is_key_down(KeyCode::Right) { Some(Direction::East) }
+            else if is_key_down(KeyCode::Up) { Some(Direction::North) }
+            else if is_key_down(KeyCode::Down) { Some(Direction::South) }
+            else { None };
+
+         if game_state == GameState::InProgress {
+            let time_elapsed = Duration::from_secs_f32(time::get_frame_time());
+            let mut should_take_turn = false;
+
+            time_until_next_turn = time_until_next_turn
+               .checked_sub(time_elapsed)
+               .unwrap_or_else(|| {
+                  should_take_turn = true;
+                  TURN_DURATION - (time_elapsed - time_until_next_turn).min(TURN_DURATION)
+               });
+
+            if should_take_turn {
+               if let GeneratorState::Complete(_) = co.as_mut().resume_with(input) {
+                  // End the game and show the overlay.
+                  game_state = GameState::GameOver;
+               }
+            }
+         }
+
+         const BG_COLOR : Color = Color::new(0.73, 0.4, 0.17, 1f32);
+         clear_background(BG_COLOR);
+
+         let turn_progress = 1f32 - time_until_next_turn.div_duration_f32(TURN_DURATION);
+         host.with_game(|game| {
+            for snake in game.snakes.iter() {
+               draw::draw_snake(snake, turn_progress, None);
+            }
+         });
+
+         if game_state != GameState::InProgress {
+            const PAUSED_TITLE_TEXT : &str = "Out West!";
+            const GAME_OVER_TITLE_TEXT : &str = "Game Over!";
+            let title_text_params = TextParams {
+               font: None,
+               font_size: 128,
+               color: WHITE,
+               ..Default::default()
+            };
+            
+            const PAUSED_PROMPT_TEXT : &str = "Press SPACE to pause or resume the game.";
+            const GAME_OVER_PROMPT_TEXT : &str = "Press SPACE to start a new game.";
+            let prompt_text_params = TextParams {
+               font_size: 32,
+               ..title_text_params
+            };
+
+            let screen_center = 0.5f32 * Vec2::from(screen_size());
+            let title_text = if game_state == GameState::GameOver { GAME_OVER_TITLE_TEXT } else { PAUSED_TITLE_TEXT };
+            let title_text_center = get_text_center(title_text, None, title_text_params.font_size, title_text_params.font_scale, title_text_params.rotation);
+            let title_text_pos = screen_center - title_text_center;
+            draw_text_ex(title_text, title_text_pos.x, title_text_pos.y, title_text_params);
+
+            let prompt_text = if game_state == GameState::GameOver { GAME_OVER_PROMPT_TEXT } else { PAUSED_PROMPT_TEXT };
+            let prompt_text_center = get_text_center(prompt_text, None, prompt_text_params.font_size, prompt_text_params.font_scale, prompt_text_params.rotation);
+            let prompt_text_pos = (screen_center + Vec2{ x: 0.0, y: 64.0 }) - prompt_text_center;
+            draw_text_ex(prompt_text, prompt_text_pos.x, prompt_text_pos.y, prompt_text_params);
+         }
+
+         next_frame().await;
       }
-
-      next_frame().await;
    }
 }

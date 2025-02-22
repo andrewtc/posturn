@@ -196,6 +196,18 @@ impl Game {
 
       swap(&mut self.snakes, temp_snakes);
    }
+
+   fn is_game_over(&self) -> bool {
+      let is_player_alive = self.snakes.iter()
+         .find(|snake| snake.player_index == self.player_index && snake.alive)
+         .is_some();
+      
+      let num_live_snakes = self.snakes.iter()
+         .filter(|snake| snake.alive)
+         .count();
+
+      !is_player_alive || num_live_snakes <= 1
+   }
 }
 
 impl Play for Game {
@@ -219,6 +231,10 @@ impl Play for Game {
                game.handle_movement(input, &mut temp_snakes);
                game.handle_post_collisions(&mut temp_snakes, &mut temp_overlaps, &mut temp_points_by_player);
             });
+            
+            if ctx.host.borrow_game().is_game_over() {
+               return;
+            }
          }
       }
    }
