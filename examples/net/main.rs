@@ -111,7 +111,11 @@ async fn main() {
             game_state = match game_state {
                GameState::Paused => GameState::InProgress,
                GameState::InProgress => GameState::Paused,
-               GameState::GameOver => break 'new_game,
+               GameState::GameOver => {
+                  // Don't allow restarting the game until the current turn animation has played out.
+                  if time_until_next_turn == Duration::ZERO { break 'new_game; }
+                  else { GameState::GameOver }
+               },
             };
          }
 
@@ -122,18 +126,25 @@ async fn main() {
             else if is_key_down(KeyCode::Down) { Some(Direction::South) }
             else { None };
 
-         if game_state == GameState::InProgress {
+         if game_state != GameState::Paused {
             let time_elapsed = Duration::from_secs_f32(time::get_frame_time());
-            let mut should_take_turn = false;
+            let mut is_turn_over = false;
 
             time_until_next_turn = time_until_next_turn
                .checked_sub(time_elapsed)
                .unwrap_or_else(|| {
-                  should_take_turn = true;
-                  TURN_DURATION - (time_elapsed - time_until_next_turn).min(TURN_DURATION)
+                  if game_state == GameState::GameOver {
+                     // Let the current turn play out, but don't start a new turn.
+                     Duration::ZERO
+                  }
+                  else {
+                     // Start the next turn partially completed so that the animation is smooth.
+                     is_turn_over = true;
+                     TURN_DURATION - (time_elapsed - time_until_next_turn).min(TURN_DURATION)
+                  }
                });
 
-            if should_take_turn {
+            if game_state != GameState::GameOver && is_turn_over {
                if let GeneratorState::Complete(_) = co.as_mut().resume_with(input) {
                   // End the game and show the overlay.
                   game_state = GameState::GameOver;
