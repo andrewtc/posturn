@@ -1,7 +1,7 @@
 mod draw;
 mod game;
 
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use futures::pin_mut;
 use game::{Game, direction::Direction, snake::{Snake, SpawnParams}};
@@ -29,7 +29,6 @@ async fn main() {
    set_window_size(WINDOW_WIDTH, WINDOW_HEIGHT);
 
    const PLAY_AREA_HALF_EXTENTS : U16Vec2 = u16vec2(20, 15);
-   const RANDOM_SEED : u64 = 12345;
 
    let spawn_params = [
       SpawnParams {
@@ -89,7 +88,7 @@ async fn main() {
       let host = posturn::Host::new(Game {
          player_index: 3,
          play_area_half_extents: PLAY_AREA_HALF_EXTENTS,
-         random_seed: RANDOM_SEED,
+         random_seed: Instant::now().elapsed().as_micros() as u64,
          snakes,
       });
 
