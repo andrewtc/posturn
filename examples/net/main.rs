@@ -105,6 +105,8 @@ async fn main() {
       const TURN_DURATION : Duration = Duration::from_millis(100);
       let mut time_until_next_turn = Duration::ZERO;
 
+      let mut desired_direction = None;
+
       'new_game: loop {
          const KEY_PAUSE : KeyCode = KeyCode::Space;
          if is_key_pressed(KEY_PAUSE) {
@@ -119,12 +121,12 @@ async fn main() {
             };
          }
 
-         let input = 
-            if is_key_down(KeyCode::Left) { Some(Direction::West) }
-            else if is_key_down(KeyCode::Right) { Some(Direction::East) }
-            else if is_key_down(KeyCode::Up) { Some(Direction::North) }
-            else if is_key_down(KeyCode::Down) { Some(Direction::South) }
-            else { None };
+         desired_direction = desired_direction.or(
+            if is_key_pressed(KeyCode::Left) { Some(Direction::West) }
+            else if is_key_pressed(KeyCode::Right) { Some(Direction::East) }
+            else if is_key_pressed(KeyCode::Up) { Some(Direction::North) }
+            else if is_key_pressed(KeyCode::Down) { Some(Direction::South) }
+            else { None });
 
          if game_state != GameState::Paused {
             let time_elapsed = Duration::from_secs_f32(time::get_frame_time());
@@ -145,7 +147,7 @@ async fn main() {
                });
 
             if game_state != GameState::GameOver && is_turn_over {
-               if let GeneratorState::Complete(_) = co.as_mut().resume_with(input) {
+               if let GeneratorState::Complete(_) = co.as_mut().resume_with(desired_direction.take()) {
                   // End the game and show the overlay.
                   game_state = GameState::GameOver;
                }
