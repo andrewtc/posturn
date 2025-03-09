@@ -1,7 +1,7 @@
 mod draw;
 mod game;
 
-use std::time::{Duration, Instant};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use futures::pin_mut;
 use game::{Game, direction::Direction, snake::{Snake, SpawnParams}};
@@ -85,10 +85,13 @@ async fn main() {
          })
          .collect();
 
+      let random_seed = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_micros() as u64;
+      println!("Random seed: {random_seed}");
+
       let host = posturn::Host::new(Game {
          player_index: 3,
          play_area_half_extents: PLAY_AREA_HALF_EXTENTS,
-         random_seed: Instant::now().elapsed().as_micros() as u64,
+         random_seed,
          snakes,
       });
 
