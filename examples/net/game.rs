@@ -22,13 +22,15 @@ pub struct Setup {
 #[derive(Debug)]
 pub struct Game {
    play_area_half_extents : U16Vec2,
-   random_seed : u64,
    snakes : Vec<Snake>,
    player_index : usize,
 }
 
 impl Game {
    pub fn with_setup(setup : Setup) -> Self {
+      // TODO: We shouldn't be setting global state like this. Game should have its own random number generator.
+      srand(setup.random_seed);
+
       let player_count : NonZeroUsize = setup.snakes_to_spawn.len().try_into().expect("Must have at least one Snake to spawn");
       let spawn_locations = Self::choose_random_spawn_locations(setup.play_area_half_extents, player_count);
 
@@ -43,7 +45,6 @@ impl Game {
 
       Self {
          play_area_half_extents: setup.play_area_half_extents,
-         random_seed: setup.random_seed,
          snakes,
          player_index: setup.player_index,
       }
@@ -317,8 +318,6 @@ impl Play for Game {
 
    fn play(ctx : posturn::Context<Self>) -> impl std::future::Future<Output = Self::Outcome> {
       async move {
-         srand(ctx.host.borrow_game().random_seed);
-
          let mut temp_snakes = vec![];
          let mut temp_overlaps = BinaryHeap::new();
          let mut temp_points_by_player = BTreeMap::new();
