@@ -1,27 +1,123 @@
 pub mod direction;
 pub mod snake;
 
-use std::{cmp::Reverse, collections::{BTreeMap, BinaryHeap}, mem::swap};
+use std::{cmp::Reverse, collections::{BTreeMap, BinaryHeap}, mem::swap, num::NonZeroUsize};
 
-use macroquad::{math::{I16Vec2, U16Vec2}, rand::{srand, RandomRange}};
+use macroquad::{math::{i16vec2, I16Vec2, U16Vec2}, rand::{srand, RandomRange}};
 use posturn::Play;
 
 use snake::{Overlap, Snake};
-use direction::Direction;
+use direction::{Direction, Offset};
 
 #[derive(Debug, Clone, Copy)]
 pub struct WaitForInput;
-
-#[derive(Debug)]
-pub struct Game
-{
+#[derive(Clone, Debug)]
+pub struct Setup {
    pub play_area_half_extents : U16Vec2,
    pub random_seed : u64,
-   pub snakes : Vec<Snake>,
+   pub snakes_to_spawn : Vec<snake::SpawnParams>,
    pub player_index : usize,
 }
 
+#[derive(Debug)]
+pub struct Game {
+   play_area_half_extents : U16Vec2,
+   random_seed : u64,
+   snakes : Vec<Snake>,
+   player_index : usize,
+}
+
 impl Game {
+   pub fn with_setup(setup : Setup) -> Self {
+      let player_count : NonZeroUsize = setup.snakes_to_spawn.len().try_into().expect("Must have at least one Snake to spawn");
+      let spawn_locations = Self::choose_random_spawn_locations(setup.play_area_half_extents, player_count);
+
+      let snakes = setup.snakes_to_spawn.into_iter()
+         .enumerate()
+         .zip(spawn_locations)
+         .map(|((player_index, params), head_tile)| {
+            Snake::try_spawn_at(head_tile, player_index, params)
+               .expect(&format!("Spawn parameters for player {player_index}'s Snake were invalid"))
+         })
+         .collect();
+
+      Self {
+         play_area_half_extents: setup.play_area_half_extents,
+         random_seed: setup.random_seed,
+         snakes,
+         player_index: setup.player_index,
+      }
+   }
+
+   fn choose_random_spawn_locations(play_area_half_extents : U16Vec2, player_count : NonZeroUsize) -> Vec<I16Vec2> {
+      struct SpawnArea {
+         corner : I16Vec2,
+         direction : Direction,
+         length : usize,
+      }
+
+      // Trace a hollow box around the play area, one tile thick. These are our potential spawn locations.
+      let spawn_area_half_extents = i16vec2(
+         play_area_half_extents.x as i16 + 1,
+         play_area_half_extents.y as i16 + 1);
+
+      let spawn_areas = [
+         SpawnArea {
+            corner: spawn_area_half_extents * i16vec2(1, 1),
+            direction: Direction::West,
+            length: spawn_area_half_extents.x as usize * 2,
+         },
+         SpawnArea {
+            corner: spawn_area_half_extents * i16vec2(-1, 1) - i16vec2(0, 1),
+            direction: Direction::North,
+            length: spawn_area_half_extents.y.saturating_sub(1) as usize * 2,
+         },
+         SpawnArea {
+            corner: spawn_area_half_extents * i16vec2(-1, -1),
+            direction: Direction::East,
+            length: spawn_area_half_extents.x as usize * 2,
+         },
+         SpawnArea {
+            corner: spawn_area_half_extents * i16vec2(1, -1) + i16vec2(0, 1),
+            direction: Direction::South,
+            length: spawn_area_half_extents.y.saturating_sub(1) as usize * 2,
+         },
+      ];
+
+      // Determine how far each spawn location will be apart, based on how much space we have to work with.
+      let spawn_tile_count = spawn_areas.iter().map(|area| area.length).sum();
+      let spawn_tile_spacing = spawn_tile_count / player_count.get();
+
+      // Choose a random tile offset for the first spawn location.
+      let mut next_offset = RandomRange::gen_range(0, spawn_tile_count);
+
+      let mut spawn_count = player_count.get();
+      let mut spawn_locations = Vec::with_capacity(spawn_count);
+      
+      for SpawnArea { corner, direction, length } in spawn_areas.iter().cycle() {
+         if next_offset > *length {
+            // Skip over this SpawnArea.
+            next_offset = next_offset.checked_sub(*length).unwrap();
+            continue;
+         }
+         
+         let offset : i16 = next_offset.try_into().expect("Offset too large");
+         let spawn_location = corner.offset(*direction, offset);
+         spawn_locations.push(spawn_location);
+         
+         spawn_count = spawn_count.checked_sub(1).expect("Ran out of Snakes to spawn");
+
+         if spawn_count == 0 {
+            // No more Snakes to spawn.
+            break;
+         }
+
+         next_offset = next_offset.saturating_add(spawn_tile_spacing) % spawn_tile_count;
+      }
+
+      spawn_locations
+   }
+
    fn handle_pre_collisions(&mut self, temp_snakes : &mut Vec<Snake>) {
       temp_snakes.clone_from(&self.snakes);
 
@@ -207,6 +303,10 @@ impl Game {
          .count();
 
       !is_player_alive || num_live_snakes <= 1
+   }
+
+   pub fn snakes(&self) -> impl Iterator<Item = &Snake> {
+      self.snakes.iter()
    }
 }
 

@@ -4,7 +4,7 @@ mod game;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use futures::pin_mut;
-use game::{Game, direction::Direction, snake::{Snake, SpawnParams}};
+use game::{Game, direction::Direction, snake::SpawnParams};
 use genawaiter::{Coroutine, GeneratorState};
 use macroquad::{prelude::*, time};
 use miniquad::window::{screen_size, set_window_size};
@@ -30,45 +30,39 @@ async fn main() {
 
    const PLAY_AREA_HALF_EXTENTS : U16Vec2 = u16vec2(20, 15);
 
-   let spawn_params = [
+   let snakes_to_spawn = vec![
       SpawnParams {
          alive: true,
-         head_tile: i16vec2(-19, -13),
          amt_to_grow: 5,
          color: GREEN,
          ..Default::default()
       },
       SpawnParams {
          alive: true,
-         head_tile: i16vec2(10, -5),
          amt_to_grow: 5,
          color: BLUE,
          ..Default::default()
       },
       SpawnParams {
          alive: true,
-         head_tile: i16vec2(5, 10),
          amt_to_grow: 5,
          color: PURPLE,
          ..Default::default()
       },
       SpawnParams {
          alive: true,
-         head_tile: i16vec2(-9, -5),
          amt_to_grow: 5,
          color: RED,
          ..Default::default()
       },
       SpawnParams {
          alive: true,
-         head_tile: i16vec2(20, 15),
          amt_to_grow: 5,
          color: YELLOW,
          ..Default::default()
       },
       SpawnParams {
          alive: true,
-         head_tile: i16vec2(-3, -3),
          amt_to_grow: 5,
          color: ORANGE,
          ..Default::default()
@@ -76,24 +70,17 @@ async fn main() {
    ];
 
    loop {
-      let snakes = spawn_params.clone()
-         .into_iter()
-         .enumerate()
-         .map(|(player_index, params)| {
-            Snake::try_spawn(player_index, params)
-               .expect(&format!("Spawn parameters for player {player_index}'s Snake were invalid"))
-         })
-         .collect();
-
       let random_seed = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_micros() as u64;
       println!("Random seed: {random_seed}");
 
-      let host = posturn::Host::new(Game {
+      let setup = game::Setup {
          player_index: 3,
          play_area_half_extents: PLAY_AREA_HALF_EXTENTS,
          random_seed,
-         snakes,
-      });
+         snakes_to_spawn: snakes_to_spawn.clone(),
+      };
+
+      let host = posturn::Host::new(Game::with_setup(setup));
 
       let co = host.play().unwrap();
       pin_mut!(co);
@@ -161,7 +148,7 @@ async fn main() {
 
          let turn_progress = 1f32 - time_until_next_turn.div_duration_f32(TURN_DURATION);
          host.with_game(|game| {
-            for snake in game.snakes.iter() {
+            for snake in game.snakes() {
                draw::draw_snake(snake, turn_progress, None);
             }
          });

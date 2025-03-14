@@ -58,7 +58,6 @@ mod snake {
    fn test_spawn() {
       let params = SpawnParams {
          alive: true,
-         head_tile: i16vec2(2, -3),
          color: BEIGE,
          amt_to_grow: 1,
          segments: vec![
@@ -70,7 +69,8 @@ mod snake {
          ..Default::default()
       };
 
-      let snake = Snake::try_spawn(SOME_PLAYER_INDEX, params).expect("Expected Snake to spawn successfully");
+      let snake = Snake::try_spawn_at(i16vec2(2, -3), SOME_PLAYER_INDEX, params)
+         .expect("Expected Snake to spawn successfully");
 
       assert_eq!(snake.alive, true);
       assert_eq!(snake.head_tile(), i16vec2(2, -3));
@@ -95,7 +95,6 @@ mod snake {
    fn test_invalid_spawn() {
       let params = SpawnParams {
          alive: true,
-         head_tile: I16Vec2::ZERO,
          color: BEIGE,
          amt_to_grow: 9,
          segments: vec![
@@ -107,24 +106,28 @@ mod snake {
          ..Default::default()
       };
 
-      let overlap = Snake::try_spawn(SOME_PLAYER_INDEX, params)
+      let overlap = Snake::try_spawn_at(I16Vec2::ZERO, SOME_PLAYER_INDEX, params)
          .expect_err("Expected error when trying to spawn Snake");
 
       assert_eq!(overlap, Overlap { segment_index: 3, offset: 2.try_into().unwrap() });
    }
 
+   struct SplitTestSnake {
+      head_tile : I16Vec2,
+      params : SpawnParams,
+   }
+
    struct SplitTestData {
       segment_index : usize,
       offset : u8,
-      expected_front : SpawnParams,
-      expected_back : SpawnParams,
+      expected_front : SplitTestSnake,
+      expected_back : SplitTestSnake,
    }
 
    #[test]
    fn test_split() {
       let params = SpawnParams {
          alive: true,
-         head_tile: I16Vec2::ZERO,
          color: BEIGE,
          amt_to_grow: 0,
          segments: vec![
@@ -134,7 +137,7 @@ mod snake {
          prev_tail_dir: Some(East),
       };
 
-      let snake_to_split = Snake::try_spawn(SOME_PLAYER_INDEX, params.clone())
+      let snake_to_split = Snake::try_spawn_at(I16Vec2::ZERO, SOME_PLAYER_INDEX, params.clone())
          .expect("Expected Snake to spawn successfully");
 
       let mut i : usize = 0;
@@ -146,9 +149,9 @@ mod snake {
          test.segment_index,
          test.offset.try_into().expect("Expected non-zero offset"));
 
-         let expected_front_snake = Snake::try_spawn(SOME_PLAYER_INDEX, test.expected_front)
+         let expected_front_snake = Snake::try_spawn_at(test.expected_front.head_tile, SOME_PLAYER_INDEX, test.expected_front.params)
             .expect(&format!("At iteration {i}, expected front Snake params were invalid"));
-         let expected_back_snake = Snake::try_spawn(SOME_PLAYER_INDEX, test.expected_back)
+         let expected_back_snake = Snake::try_spawn_at(test.expected_back.head_tile, SOME_PLAYER_INDEX, test.expected_back.params)
             .expect(&format!("At iteration {i}, expected back Snake params were invalid"));
 
          assert_eq!(front, expected_front_snake, "At iteration {i}, expected front of Snake to match");
@@ -158,72 +161,88 @@ mod snake {
       test_split(SplitTestData {
          segment_index: 0,
          offset: 1,
-         expected_front: SpawnParams {
+         expected_front: SplitTestSnake {
             head_tile: i16vec2(0, 0),
-            segments: vec![],
-            prev_tail_dir: Some(West),
-            ..params
+            params: SpawnParams {
+               segments: vec![],
+               prev_tail_dir: Some(West),
+               ..params
+            },
          },
-         expected_back: SpawnParams {
-            alive: false,
+         expected_back: SplitTestSnake {
             head_tile: i16vec2(-1, 0),
-            segments: vec![(West, 1), (South, 2)],
-            prev_tail_dir: Some(East),
-            ..params
+            params: SpawnParams {
+               alive: false,
+               segments: vec![(West, 1), (South, 2)],
+               prev_tail_dir: Some(East),
+               ..params
+            },
          },
       });
 
       test_split(SplitTestData {
          segment_index: 0,
          offset: 2,
-         expected_front: SpawnParams {
+         expected_front: SplitTestSnake {
             head_tile: i16vec2(0, 0),
-            segments: vec![(West, 1)],
-            prev_tail_dir: None,
-            ..params
+            params: SpawnParams {
+               segments: vec![(West, 1)],
+               prev_tail_dir: None,
+               ..params
+            },
          },
-         expected_back: SpawnParams {
-            alive: false,
+         expected_back: SplitTestSnake {
             head_tile: i16vec2(-2, 0),
-            segments: vec![(South, 2)],
-            prev_tail_dir: Some(East),
-            ..params
+            params: SpawnParams {
+               alive: false,
+               segments: vec![(South, 2)],
+               prev_tail_dir: Some(East),
+               ..params
+            },
          },
       });
 
       test_split(SplitTestData {
          segment_index: 1,
          offset: 1,
-         expected_front: SpawnParams {
+         expected_front: SplitTestSnake {
             head_tile: i16vec2(0, 0),
-            segments: vec![(West, 2)],
-            prev_tail_dir: None,
-            ..params
+            params: SpawnParams {
+               segments: vec![(West, 2)],
+               prev_tail_dir: None,
+               ..params
+            },
          },
-         expected_back: SpawnParams {
-            alive: false,
+         expected_back: SplitTestSnake {
             head_tile: i16vec2(-2, 1),
-            segments: vec![(South, 1)],
-            prev_tail_dir: Some(East),
-            ..params
+            params: SpawnParams {
+               alive: false,
+               segments: vec![(South, 1)],
+               prev_tail_dir: Some(East),
+               ..params
+            },
          },
       });
 
       test_split(SplitTestData {
          segment_index: 1,
          offset: 2,
-         expected_front: SpawnParams {
+         expected_front: SplitTestSnake {
             head_tile: i16vec2(0, 0),
-            segments: vec![(West, 2), (South, 1)],
-            prev_tail_dir: None,
-            ..params
+            params: SpawnParams {
+               segments: vec![(West, 2), (South, 1)],
+               prev_tail_dir: None,
+               ..params
+            },
          },
-         expected_back: SpawnParams {
-            alive: false,
+         expected_back: SplitTestSnake {
             head_tile: i16vec2(-2, 2),
-            segments: vec![],
-            prev_tail_dir: Some(East),
-            ..params
+            params: SpawnParams {
+               alive: false,
+               segments: vec![],
+               prev_tail_dir: Some(East),
+               ..params
+            },
          },
       });
    }
