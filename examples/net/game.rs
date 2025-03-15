@@ -9,8 +9,12 @@ use posturn::Play;
 use snake::{Overlap, Snake};
 use direction::{Direction, Offset};
 
+/// Event signaling that a [`Game`] is waiting to receive player input.
 #[derive(Debug, Clone, Copy)]
 pub struct WaitForInput;
+
+/// Describes the initial state of a [`Game`]. This is used to set up the game board and generate [`Snake`] starting
+/// locations.
 #[derive(Clone, Debug)]
 pub struct Setup {
    pub play_area_half_extents : U16Vec2,
@@ -19,6 +23,16 @@ pub struct Setup {
    pub player_index : usize,
 }
 
+/// Represents an area just outside the game board, i.e. running along one side, where [`Snake`]s can be spawned. These
+/// are generated automatically at the start of the game.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct SpawnArea {
+   corner : I16Vec2,
+   direction : Direction,
+   length : usize,
+}
+
+/// Holds all state for an "Out West!" game currently in progress.
 #[derive(Debug)]
 pub struct Game {
    play_area_half_extents : U16Vec2,
@@ -27,12 +41,14 @@ pub struct Game {
 }
 
 impl Game {
+   /// Creates a [`Game`] with the specified initial [`Setup`].
    pub fn with_setup(setup : Setup) -> Self {
-      // TODO: We shouldn't be setting global state like this. Game should have its own random number generator.
+      // TODO: We shouldn't be setting global state like this. Each game should have its own random number generator.
       srand(setup.random_seed);
 
       let player_count : NonZeroUsize = setup.snakes_to_spawn.len().try_into().expect("Must have at least one Snake to spawn");
-      let spawn_locations = Self::choose_random_spawn_locations(setup.play_area_half_extents, player_count);
+      let spawn_areas = Self::generate_spawn_areas(setup.play_area_half_extents);
+      let spawn_locations = Self::choose_random_spawn_locations(&spawn_areas, player_count);
 
       let snakes = setup.snakes_to_spawn.into_iter()
          .enumerate()
@@ -50,19 +66,13 @@ impl Game {
       }
    }
 
-   fn choose_random_spawn_locations(play_area_half_extents : U16Vec2, player_count : NonZeroUsize) -> Vec<I16Vec2> {
-      struct SpawnArea {
-         corner : I16Vec2,
-         direction : Direction,
-         length : usize,
-      }
-
+   fn generate_spawn_areas(play_area_half_extents : U16Vec2) -> [SpawnArea; 4] {
       // Trace a hollow box around the play area, one tile thick. These are our potential spawn locations.
       let spawn_area_half_extents = i16vec2(
          play_area_half_extents.x as i16 + 1,
          play_area_half_extents.y as i16 + 1);
 
-      let spawn_areas = [
+      [
          SpawnArea {
             corner: spawn_area_half_extents * i16vec2(1, 1),
             direction: Direction::West,
@@ -83,8 +93,10 @@ impl Game {
             direction: Direction::South,
             length: spawn_area_half_extents.y.saturating_sub(1) as usize * 2,
          },
-      ];
+      ]
+   }
 
+   fn choose_random_spawn_locations(spawn_areas : &[SpawnArea; 4], player_count : NonZeroUsize) -> Vec<I16Vec2> {
       // Determine how far each spawn location will be apart, based on how much space we have to work with.
       let spawn_tile_count = spawn_areas.iter().map(|area| area.length).sum();
       let spawn_tile_spacing = spawn_tile_count / player_count.get();
