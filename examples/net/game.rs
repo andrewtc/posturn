@@ -1,6 +1,9 @@
 pub mod direction;
 pub mod snake;
 
+#[cfg(test)]
+mod tests;
+
 use std::{cmp::Reverse, collections::{BTreeMap, BinaryHeap}, mem::swap, num::NonZeroUsize};
 
 use macroquad::{math::{i16vec2, I16Vec2, U16Vec2}, rand::{srand, RandomRange}};
@@ -99,33 +102,41 @@ impl Game {
    fn choose_random_spawn_locations(spawn_areas : &[SpawnArea; 4], player_count : NonZeroUsize) -> Vec<I16Vec2> {
       // Determine how far each spawn location will be apart, based on how much space we have to work with.
       let spawn_tile_count = spawn_areas.iter().map(|area| area.length).sum();
-      let spawn_tile_spacing = spawn_tile_count / player_count.get();
+      assert!(player_count.get() <= spawn_tile_count, "Spawn areas are NOT large enough to generate all spawn locations. We need {player_count} tiles, but only have {spawn_tile_count}.");
 
-      // Choose a random tile offset for the first spawn location.
-      let mut next_offset = RandomRange::gen_range(0, spawn_tile_count);
+      // NOTE: This is fractional so that we can keep track of a partial remainder as we visit tiles. This allows us to
+      // more evenly distribute spawn locations around the edge of the game board, with some pairs of Snakes being one
+      // tile farther apart than the others.
+      let spawn_tile_spacing = spawn_tile_count as f64 / player_count.get() as f64;
+
+      // Choose a random tile offset for the first spawn location. Double-precision so that we can carry over a
+      // fractional remainder for the next spawn location.
+      let mut next_offset = RandomRange::gen_range(0, spawn_tile_count) as f64;
 
       let mut spawn_count = player_count.get();
       let mut spawn_locations = Vec::with_capacity(spawn_count);
       
-      for SpawnArea { corner, direction, length } in spawn_areas.iter().cycle() {
-         if next_offset > *length {
-            // Skip over this SpawnArea.
-            next_offset = next_offset.checked_sub(*length).unwrap();
-            continue;
-         }
-         
-         let offset : i16 = next_offset.try_into().expect("Offset too large");
-         let spawn_location = corner.offset(*direction, offset);
-         spawn_locations.push(spawn_location);
-         
-         spawn_count = spawn_count.checked_sub(1).expect("Ran out of Snakes to spawn");
+      'spawn: for SpawnArea { corner, direction, length } in spawn_areas.iter().cycle() {
+         loop {
+            if next_offset > *length as f64 {
+               // The next offset places the spawn location in a different SpawnArea. Skip over this one entirely.
+               next_offset -= *length as f64;
+               continue 'spawn;
+            }
 
-         if spawn_count == 0 {
-            // No more Snakes to spawn.
-            break;
-         }
+            spawn_count -= 1;
+            
+            let offset : i16 = (next_offset as i64).try_into().expect("Offset too large");
+            let spawn_location = corner.offset(*direction, offset);
+            spawn_locations.push(spawn_location);
 
-         next_offset = next_offset.saturating_add(spawn_tile_spacing) % spawn_tile_count;
+            next_offset += spawn_tile_spacing;
+
+            if spawn_count == 0 {
+               // All spawn locations have been generated.
+               break 'spawn;
+            }
+         }
       }
 
       spawn_locations
