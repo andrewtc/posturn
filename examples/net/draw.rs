@@ -11,6 +11,27 @@ pub fn grid_to_window(tile_pos : I16Vec2) -> Vec2 {
    screen_half_extents + tile_pos.as_vec2() * TILE_SIZE
 }
 
+pub fn draw_play_area(play_area_half_extents : U16Vec2, color : Color) {
+   let unplayable_area_color = darken(color);
+   clear_background(unplayable_area_color);
+
+   let screen_half_extents = 0.5 * vec2(screen_width(), screen_height());
+   let play_area_half_screen_size = vec2(play_area_half_extents.x as f32 + 0.5, play_area_half_extents.y as f32 + 0.5) * TILE_SIZE;
+   let screen_top_left = screen_half_extents - play_area_half_screen_size;
+
+   let [top, left] = screen_top_left.to_array();
+   let [width, height] = (2.0f32 * play_area_half_screen_size).to_array();
+   draw_rectangle(top, left, width, height, color);
+
+   for x in -(play_area_half_extents.x as i16 - 1)..=(play_area_half_extents.x as i16) {
+      for y in -(play_area_half_extents.y as i16 - 1)..=(play_area_half_extents.y as i16) {
+         const GRID_POINT_RADIUS : f32 = 1.0f32;
+         let [screen_x, screen_y] = (grid_to_window(i16vec2(x, y)) - 0.5f32 * TILE_SIZE).to_array();
+         draw_circle(screen_x, screen_y, GRID_POINT_RADIUS, unplayable_area_color);
+      }
+   }
+}
+
 pub fn draw_head(pos : Vec2, direction : Direction, color : Color, alive : bool) {
    draw_circle(pos.x, pos.y, TILE_SIZE / 2 as f32, color);
 
@@ -66,16 +87,7 @@ pub fn draw_snake(snake : &Snake, turn_progress : f32, color_override : Option<C
    let mut color = color_override.unwrap_or(snake.color);
 
    if !snake.alive {
-      // Make dead Snakes render in more muted colors.
-      let (hue, mut saturation, mut luminosity) = color::rgb_to_hsl(color);
-      
-      const SATURATION_SHIFT : f32 = 0.1;
-      saturation = (saturation - SATURATION_SHIFT).max(0.0);
-      
-      const LUMINOSITY_SHIFT : f32 = 0.1;
-      luminosity = (luminosity - LUMINOSITY_SHIFT).max(0.0);
-
-      color = color::hsl_to_rgb(hue, saturation, luminosity);
+      color = darken(color);
    }
 
    for (corner, segment) in snake.segments() {
@@ -100,4 +112,16 @@ pub fn draw_snake(snake : &Snake, turn_progress : f32, color_override : Option<C
 
    // Draw the head on top of the rest of the body.
    draw_head(head_screen_pos, snake.facing(), color, snake.alive);
+}
+
+pub fn darken(color : Color) -> Color {
+   let (hue, mut saturation, mut luminosity) = color::rgb_to_hsl(color);
+   
+   const SATURATION_SHIFT : f32 = 0.1;
+   saturation = (saturation - SATURATION_SHIFT).max(0.0);
+   
+   const LUMINOSITY_SHIFT : f32 = 0.1;
+   luminosity = (luminosity - LUMINOSITY_SHIFT).max(0.0);
+
+   color::hsl_to_rgb(hue, saturation, luminosity)
 }

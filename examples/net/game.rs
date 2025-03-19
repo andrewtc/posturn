@@ -329,6 +329,10 @@ impl Game {
       !is_player_alive || num_live_snakes <= 1
    }
 
+   pub fn play_area_half_extents(&self) -> U16Vec2 {
+      self.play_area_half_extents
+   }
+
    pub fn snakes(&self) -> impl Iterator<Item = &Snake> {
       self.snakes.iter()
    }

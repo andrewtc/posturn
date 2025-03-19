@@ -144,7 +144,7 @@ async fn main() {
          }
 
          const BG_COLOR : Color = Color::new(0.73, 0.4, 0.17, 1f32);
-         clear_background(BG_COLOR);
+         draw::draw_play_area(host.borrow_game().play_area_half_extents(), BG_COLOR);
 
          let turn_progress = 1f32 - time_until_next_turn.div_duration_f32(TURN_DURATION);
          host.with_game(|game| {
