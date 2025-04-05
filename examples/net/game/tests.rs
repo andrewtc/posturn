@@ -26,6 +26,23 @@ fn test_spawn_areas()
 
    use Direction::*;
 
+   // 2 2 2
+   // 1 . 3
+   // 0 0 0
+   assert_spawn_areas_match(TestData {
+      play_area_half_extents: u16vec2(0, 0),
+      expected_spawn_areas: [
+         SpawnArea { corner: i16vec2( 1, 1), direction:  West, length: 2 },
+         SpawnArea { corner: i16vec2(-1, 0), direction: North, length: 0 },
+         SpawnArea { corner: i16vec2(-1,-1), direction:  East, length: 2 },
+         SpawnArea { corner: i16vec2( 1, 0), direction: South, length: 0 },
+      ]});
+
+   // 2 2 2 2 2
+   // 1 . . . 3
+   // 1 . . . 3
+   // 1 . . . 3
+   // 0 0 0 0 0
    assert_spawn_areas_match(TestData {
       play_area_half_extents: u16vec2(1, 1),
       expected_spawn_areas: [
@@ -35,6 +52,11 @@ fn test_spawn_areas()
          SpawnArea { corner: i16vec2( 2,-1), direction: South, length: 2 },
       ]});
 
+   // 2 2 2 2 2 2 2
+   // 1 . . . . . 3
+   // 1 . . . . . 3
+   // 1 . . . . . 3
+   // 0 0 0 0 0 0 0
    assert_spawn_areas_match(TestData {
       play_area_half_extents: u16vec2(2, 1),
       expected_spawn_areas: [
@@ -44,6 +66,13 @@ fn test_spawn_areas()
          SpawnArea { corner: i16vec2( 3,-1), direction: South, length: 2 },
       ]});
 
+   // 2 2 2 2 2
+   // 1 . . . 3
+   // 1 . . . 3
+   // 1 . . . 3
+   // 1 . . . 3
+   // 1 . . . 3
+   // 0 0 0 0 0
    assert_spawn_areas_match(TestData {
       play_area_half_extents: u16vec2(1, 2),
       expected_spawn_areas: [
@@ -98,6 +127,10 @@ fn test_spawn_locations() {
          i16vec2( 2,  0),
       ]});
 
+   // . . X .
+   // .     .
+   // .     .
+   // . . . .
    assert_spawn_locations_match(TestData {
       random_seed: 54321,
       spawn_areas: [

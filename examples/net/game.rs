@@ -20,6 +20,9 @@ pub struct WaitForInput;
 /// locations.
 #[derive(Clone, Debug)]
 pub struct Setup {
+   /// The extents of the play area. These are **relative** to the center tile, which is at `(0, 0)`. For this reason,
+   /// the width and height of the area can never be zero as there is **always** a center tile. For example, passing a
+   /// value of `(2, 1)` will create a play area of size `(2*2 + 1, 1*1 + 1) = (5, 3)` tiles.
    pub play_area_half_extents : U16Vec2,
    pub random_seed : u64,
    pub snakes_to_spawn : Vec<snake::SpawnParams>,
