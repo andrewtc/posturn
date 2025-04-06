@@ -48,38 +48,36 @@ impl TryFrom<(Direction, u8)> for Segment {
 
 #[derive(Clone, Debug, Default)]
 pub struct SpawnParams {
+   pub player_index : usize,
    pub alive : bool,
    pub amt_to_grow : u16,
-   pub color : Color,
    pub segments : Vec<(Direction, u8)>,
    pub prev_tail_dir : Option<Direction>,
 }
 
 #[derive(Clone, Debug)]
 pub struct Snake {
-   pub player_index : usize,
+   player_index : usize,
    pub alive : bool,
    head_tile : I16Vec2,
    segments : VecDeque<Segment>,
    amt_to_grow : u16,
    prev_tail_dir : Option<Direction>,
-   pub color : Color,
 }
 
 impl Snake {
-   pub fn try_spawn_at(head_tile : I16Vec2, player_index : usize, params : SpawnParams) -> Result<Snake, Overlap> {
+   pub fn try_spawn_at(head_tile : I16Vec2, params : SpawnParams) -> Result<Snake, Overlap> {
       let segments : VecDeque<Segment> = params.segments.into_iter()
          .map(|raw_parts| raw_parts.try_into().expect("Length cannot be zero"))
          .collect();
 
       let snake = Self {
-         player_index,
+         player_index: params.player_index,
          alive: params.alive,
          head_tile,
          segments,
          prev_tail_dir: params.prev_tail_dir,
          amt_to_grow: params.amt_to_grow,
-         color: params.color,
       };
 
       if let Some(overlap) = snake.find_body_overlap(snake.head_tile) {
@@ -242,6 +240,10 @@ impl Snake {
       None
    }
 
+   pub fn player_index(&self) -> usize {
+      self.player_index
+   }
+
    pub fn head_tile(&self) -> I16Vec2 {
       self.head_tile
    }
@@ -286,8 +288,7 @@ impl PartialEq for Snake {
       self.head_tile == other.head_tile &&
       self.segments == other.segments &&
       self.prev_tail_dir == other.prev_tail_dir &&
-      self.amt_to_grow == other.amt_to_grow &&
-      self.color == other.color
+      self.amt_to_grow == other.amt_to_grow
    }
 }
 

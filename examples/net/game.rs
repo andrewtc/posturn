@@ -24,9 +24,15 @@ pub struct Setup {
    /// the width and height of the area can never be zero as there is **always** a center tile. For example, passing a
    /// value of `(2, 1)` will create a play area of size `(2*2 + 1, 1*1 + 1) = (5, 3)` tiles.
    pub play_area_half_extents : U16Vec2,
+
+   /// The random seed to use when spawning [`Snake`]s.
    pub random_seed : u64,
-   pub snakes_to_spawn : Vec<snake::SpawnParams>,
-   pub player_index : usize,
+
+   /// The number of players to spawn. Each player controls one [`Snake`].
+   pub player_count : NonZeroUsize,
+
+   /// The amount that each [`Snake`] will grow on spawn. The final length will be this plus one.
+   pub spawn_amt_to_grow : u16,
 }
 
 /// Represents an area just outside the game board, i.e. running along one side, where [`Snake`]s can be spawned. These
@@ -42,8 +48,8 @@ struct SpawnArea {
 #[derive(Debug)]
 pub struct Game {
    play_area_half_extents : U16Vec2,
+   player_count : NonZeroUsize,
    snakes : Vec<Snake>,
-   player_index : usize,
 }
 
 impl Game {
@@ -52,23 +58,32 @@ impl Game {
       // TODO: We shouldn't be setting global state like this. Each game should have its own random number generator.
       srand(setup.random_seed);
 
-      let player_count : NonZeroUsize = setup.snakes_to_spawn.len().try_into().expect("Must have at least one Snake to spawn");
       let spawn_areas = Self::generate_spawn_areas(setup.play_area_half_extents);
-      let spawn_locations = Self::choose_random_spawn_locations(&spawn_areas, player_count);
+      let spawn_locations = Self::choose_random_spawn_locations(&spawn_areas, setup.player_count);
 
-      let snakes = setup.snakes_to_spawn.into_iter()
+      let snakes_to_spawn : Vec<snake::SpawnParams> = (0..setup.player_count.get())
+         .into_iter()
+         .map(|player_index : usize| snake::SpawnParams {
+            alive: true,
+            amt_to_grow: setup.spawn_amt_to_grow,
+            player_index,
+            ..Default::default()
+         })
+         .collect();
+
+      let snakes = snakes_to_spawn.into_iter()
          .enumerate()
          .zip(spawn_locations)
-         .map(|((player_index, params), head_tile)| {
-            Snake::try_spawn_at(head_tile, player_index, params)
-               .expect(&format!("Spawn parameters for player {player_index}'s Snake were invalid"))
+         .map(|((index, params), head_tile)| {
+            Snake::try_spawn_at(head_tile, params)
+               .expect(&format!("Spawn parameters for Snake at index {index} were invalid"))
          })
          .collect();
 
       Self {
          play_area_half_extents: setup.play_area_half_extents,
+         player_count: setup.player_count,
          snakes,
-         player_index: setup.player_index,
       }
    }
 
@@ -167,9 +182,9 @@ impl Game {
       }
    }
 
-   fn handle_movement(&mut self, input : Option<Direction>, temp_snakes : &mut Vec<Snake>) {
+   fn handle_movement(&mut self, input : &[Option<Direction>], temp_snakes : &mut Vec<Snake>) {
+      assert_eq!(input.len(), self.player_count.get(), "Expected {} player inputs, but found {}", self.player_count, input.len());
       let play_area_half_extents = self.play_area_half_extents;
-      let player_index = self.player_index;
 
       temp_snakes.clear();
 
@@ -213,16 +228,7 @@ impl Game {
                }
                else { false }
             }
-            else if snake.player_index != player_index {
-               // Turn randomly to simulate player input.
-               const CHANCE_TO_TURN : f32 = 0.1;
-               if f32::gen_range(0.0, 1.0) <= CHANCE_TO_TURN {
-                  if u8::gen_range(0, 2) == 0 { snake.grow_cw().is_ok() }
-                  else { snake.grow_ccw().is_ok() }
-               }
-               else { false }
-            }
-            else if let Some(direction) = input {
+            else if let Some(direction) = input[snake.player_index()] {
                // Allow the player to steer.
                if direction == cw { snake.grow_cw().is_ok() }
                else if direction == ccw { snake.grow_ccw().is_ok() }
@@ -268,7 +274,7 @@ impl Game {
                continue;
             }
 
-            let points = temp_points_by_player.entry(overlapping_snake.player_index);
+            let points = temp_points_by_player.entry(overlapping_snake.player_index());
             let add_point = || {
                points.and_modify(|value| *value = value.saturating_add(1)).or_insert(1)
             };
@@ -311,7 +317,7 @@ impl Game {
 
       for snake in temp_snakes.iter_mut() {
          if !snake.alive { continue; }
-         else if let Some(points) = temp_points_by_player.get(&snake.player_index) {
+         else if let Some(points) = temp_points_by_player.get(&snake.player_index()) {
             // Add length to each Snake based on the number of points accumulated.
             snake.lengthen(*points);
          }
@@ -321,15 +327,11 @@ impl Game {
    }
 
    fn is_game_over(&self) -> bool {
-      let is_player_alive = self.snakes.iter()
-         .find(|snake| snake.player_index == self.player_index && snake.alive)
-         .is_some();
-      
       let num_live_snakes = self.snakes.iter()
          .filter(|snake| snake.alive)
          .count();
 
-      !is_player_alive || num_live_snakes <= 1
+      num_live_snakes <= 1
    }
 
    pub fn play_area_half_extents(&self) -> U16Vec2 {
@@ -343,7 +345,7 @@ impl Game {
 
 impl Play for Game {
    type Event = WaitForInput;
-   type Input = Option<Direction>;
+   type Input = Vec<Option<Direction>>;
    type Outcome = ();
 
    fn play(ctx : posturn::Context<Self>) -> impl std::future::Future<Output = Self::Outcome> {
@@ -357,7 +359,7 @@ impl Play for Game {
 
             ctx.host.with_game_mut(|mut game| {
                game.handle_pre_collisions(&mut temp_snakes);
-               game.handle_movement(input, &mut temp_snakes);
+               game.handle_movement(&input, &mut temp_snakes);
                game.handle_post_collisions(&mut temp_snakes, &mut temp_overlaps, &mut temp_points_by_player);
             });
             

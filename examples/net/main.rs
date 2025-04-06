@@ -1,13 +1,15 @@
 mod draw;
 mod game;
+mod player;
 
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use futures::pin_mut;
-use game::{Game, direction::Direction, snake::SpawnParams};
+use game::{Game, direction::Direction};
 use genawaiter::{Coroutine, GeneratorState};
-use macroquad::{prelude::*, time};
+use macroquad::{prelude::*, rand::RandomRange, time};
 use miniquad::window::{screen_size, set_window_size};
+use player::{Control, KeyControls};
 
 /// The state of the game window.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -30,54 +32,25 @@ async fn main() {
 
    const PLAY_AREA_HALF_EXTENTS : U16Vec2 = u16vec2(20, 15);
 
-   let snakes_to_spawn = vec![
-      SpawnParams {
-         alive: true,
-         amt_to_grow: 5,
-         color: GREEN,
-         ..Default::default()
-      },
-      SpawnParams {
-         alive: true,
-         amt_to_grow: 5,
-         color: BLUE,
-         ..Default::default()
-      },
-      SpawnParams {
-         alive: true,
-         amt_to_grow: 5,
-         color: PURPLE,
-         ..Default::default()
-      },
-      SpawnParams {
-         alive: true,
-         amt_to_grow: 5,
-         color: RED,
-         ..Default::default()
-      },
-      SpawnParams {
-         alive: true,
-         amt_to_grow: 5,
-         color: YELLOW,
-         ..Default::default()
-      },
-      SpawnParams {
-         alive: true,
-         amt_to_grow: 5,
-         color: ORANGE,
-         ..Default::default()
-      },
+   const PLAYERS : &'static [player::Control] = &[
+      player::Control::Manual(&KeyControls::ARROW_KEYS),
+      player::Control::Manual(&KeyControls::WASD),
+      player::Control::Auto,
+      player::Control::Auto,
+      player::Control::Auto,
+      player::Control::Auto,
    ];
 
    loop {
       let random_seed = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_micros() as u64;
       println!("Random seed: {random_seed}");
 
+      let player_count = PLAYERS.len().try_into().expect("Must spawn at least one player");
       let setup = game::Setup {
-         player_index: 3,
          play_area_half_extents: PLAY_AREA_HALF_EXTENTS,
          random_seed,
-         snakes_to_spawn: snakes_to_spawn.clone(),
+         player_count,
+         spawn_amt_to_grow: 5,
       };
 
       let host = posturn::Host::new(Game::with_setup(setup));
@@ -86,7 +59,7 @@ async fn main() {
       pin_mut!(co);
 
       // We want to see Snakes already spawned when we start the game.
-      co.as_mut().resume_with(None);
+      co.as_mut().resume_with(vec![]);
 
       // Start the game paused.
       let mut game_state = GameState::Paused;
@@ -94,7 +67,7 @@ async fn main() {
       const TURN_DURATION : Duration = Duration::from_millis(100);
       let mut time_until_next_turn = Duration::ZERO;
 
-      let mut desired_direction = None;
+      let mut inputs : Vec<Option<Direction>> = Vec::with_capacity(player_count.get());
 
       'new_game: loop {
          const KEY_PAUSE : KeyCode = KeyCode::Space;
@@ -110,12 +83,27 @@ async fn main() {
             };
          }
 
-         desired_direction = desired_direction.or(
-            if is_key_pressed(KeyCode::Left) { Some(Direction::West) }
-            else if is_key_pressed(KeyCode::Right) { Some(Direction::East) }
-            else if is_key_pressed(KeyCode::Up) { Some(Direction::North) }
-            else if is_key_pressed(KeyCode::Down) { Some(Direction::South) }
-            else { None });
+         inputs.resize(player_count.get(), None);
+
+         for (player, input) in PLAYERS.iter().zip(inputs.iter_mut()) {
+            *input = input.or(match player {
+               Control::Manual(key_controls) => key_controls.desired_direction(),
+               Control::Auto => {
+                  // Turn randomly to simulate player input.
+                  const CHANCE_TO_TURN : f32 = 0.02;
+                  if f32::gen_range(0.0, 1.0) <= CHANCE_TO_TURN {
+                     match u8::gen_range(0, 4) {
+                        0 => Some(Direction::West),
+                        1 => Some(Direction::East),
+                        2 => Some(Direction::North),
+                        3 => Some(Direction::South),
+                        _ => unreachable!("Random roll should always match a cardinal direction"),
+                     }
+                  }
+                  else { None }
+               },
+            })
+         }
 
          if game_state != GameState::Paused {
             let time_elapsed = Duration::from_secs_f32(time::get_frame_time());
@@ -136,7 +124,7 @@ async fn main() {
                });
 
             if game_state != GameState::GameOver && is_turn_over {
-               if let GeneratorState::Complete(_) = co.as_mut().resume_with(desired_direction.take()) {
+               if let GeneratorState::Complete(_) = co.as_mut().resume_with(inputs.drain(..).collect()) {
                   // End the game and show the overlay.
                   game_state = GameState::GameOver;
                }

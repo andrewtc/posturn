@@ -6,6 +6,15 @@ use crate::game::{direction::Direction, snake::Snake};
 
 const TILE_SIZE : f32 = 24f32;
 
+const PLAYER_COLORS : &'static [Color] = &[
+   RED,
+   GREEN,
+   BLUE,
+   YELLOW,
+   PURPLE,
+   PINK,
+];
+
 pub fn grid_to_window(tile_pos : I16Vec2) -> Vec2 {
    let screen_half_extents = 0.5 * vec2(screen_width(), screen_height());
    screen_half_extents + tile_pos.as_vec2() * TILE_SIZE
@@ -84,7 +93,7 @@ pub fn draw_snake(snake : &Snake, turn_progress : f32, color_override : Option<C
 
    let mut last_segment_end_tile = head_tile;
    let mut last_segment_end_pos = head_screen_pos;
-   let mut color = color_override.unwrap_or(snake.color);
+   let mut color = color_override.unwrap_or(PLAYER_COLORS[snake.player_index()]);
 
    if !snake.alive {
       color = darken(color);
