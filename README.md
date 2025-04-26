@@ -11,34 +11,36 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 # 🏰 posturn 🎮
 Build turn-based games with `async` Rust
 
-This crate offers a simple way to create complex turn-based games. Instead of modeling the game as a monolithic state
-machine with transitions, why not write a [`Coroutine`](https://doc.rust-lang.org/std/ops/trait.Coroutine.html)
+This crate offers a simple way to model turn-based games. Instead of writing a monolithic state
+machine, why not a [`Coroutine`](https://doc.rust-lang.org/std/ops/trait.Coroutine.html)
 instead?
 
-`posturn` allows you to model your turn-based game logic as an `async` function that emits events. When an event is
-emitted, the turn-based game enters into a wait-for-input state using `await`, pausing the game and returning control
-to the UI layer. While paused, the UI can handle the event and re-render itself however it wishes. Once the player is
-ready to continue, the UI resumes the turn-based game, supplying any player input necessary to take the next turn.
+`posturn` allows you to write your turn-based game logic as an `async` function that emits events back to calling code.
+When an event is emitted, the game enters a wait-for-input state using `await`, pausing and returning control to the UI
+layer. The UI can handle the event and re-render itself however it wishes. When ready to continue, the UI resumes the
+game. This calls back into the coroutine, providing all player input necessary to take the next turn.
 
-This approach has the advantage of keeping all UI logic separate from turn-based game code. Theoretically, a game
-written in this way could be used with _any_ frontend capable of processing the events emitted by the game.
+This approach has the advantage of maintaining a clean separation between turn-based game logic and the UI layer. A game
+written in this manner can be used with _any_ frontend capable of processing events emitted by the game. This makes it
+possible to write, for instance, two game clients in entirely different game engines with no changes to the underlying
+game logic.
 
 For a very simple example, see [`RoShamBo`](/src/tests.rs) in the `tests` module.
 
-For a complete, interactive game built with `posturn`, see [`examples/tui`](/examples/tui/README.md).
+For a complete game built with `posturn`, see [`examples/tui`](/examples/tui/README.md).
 
 ## 📃 Usage
 To use `posturn`, simply add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-posturn = "0.2.0"
+posturn = "0.3.0"
 ```
 
 Alternatively, run the following from your crate root:
 
 ```ps1
-cargo add posturn@0.2.0
+cargo add posturn@0.3.0
 ```
 
 ## ⚠️ Compatibility
