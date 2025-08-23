@@ -7,6 +7,7 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 [![Build Status](https://github.com/andrewtc/posturn/actions/workflows/rust.yml/badge.svg?branch=main)](https://github.com/andrewtc/posturn/actions/workflows/rust.yml?branch=main)
 [![Docs Status](https://docs.rs/posturn/badge.svg)](https://docs.rs/posturn)
 [![REUSE status](https://api.reuse.software/badge/github.com/andrewtc/posturn)](https://api.reuse.software/info/github.com/andrewtc/posturn)
+[![Discord](https://img.shields.io/discord/1408632789347336316?logo=discord)](https://discord.gg/QyWYW6WB)
 
 # 🏰 posturn 🎮
 Build turn-based games with `async` Rust
