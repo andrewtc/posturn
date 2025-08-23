@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: MIT
 
-name: REUSE Compliance Check
+name: REUSE
 on: [push, pull_request]
 jobs:
   test:
