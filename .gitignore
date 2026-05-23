@@ -21,4 +21,5 @@ Cargo.lock
 /target
 
 # Ignore IDE-related files.
+.idea
 .vscode
