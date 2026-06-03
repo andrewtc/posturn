@@ -1,3 +1,4 @@
 # Summary
 
-- [The Next Turn](./next_turn.md)
+- [Design Philosophy](./design_philosophy.md)
+- [Next Turn](./next_turn.md)
