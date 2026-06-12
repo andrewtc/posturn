@@ -4,45 +4,77 @@ Before getting started, it's important to understand the current state of `postu
 
 `posturn` gives you an easy way to separate all turn-based _game logic_ from all _client-facing_ concerns such as input processing, rendering, networking, etc. The idea is that all code for enforcing the rules of your game lives in a separate layer such that you can write a complete UI layer on top of it without changing a single line of code.
 
-Event processing in `v0.3` of `posturn` looks something like this:
+For a framework that is all about event processing, the main game loop in `v0.3` of `posturn` leaves a lot to be desired. Let's take a look at a very simple example:
 
 ```rust,no_run
-# use std::pin::pin;
-# 
-# struct Host<G> { game: G }
-# struct MyGame;
-# impl MyGame { fn default() -> Self { MyGame } }
-# impl Host<MyGame> {
-#     fn new(_: MyGame) -> Self { Host { game: MyGame } }
-#     fn play(&self) -> Result<(), ()> { Ok(()) }
-#     fn with_game<F, R>(&self, f: F) -> Result<R, ()> where F: FnOnce(&MyGame) -> R { Ok(f(&self.game)) }
+extern crate posturn;
+
+#[macro_use]
+extern crate futures;
+
+# mod game {
+#    pub struct PlayerInput;
+#    impl PlayerInput { pub fn default() -> Self { Self } }
+#    pub struct MyGame;
+#    impl MyGame { pub fn new() -> Self { Self } }
+#    impl posturn::Play for MyGame {
+#       type Input = PlayerInput;
+#       type Event = ();
+#       type Outcome = ();
+#       fn play(_ctx : posturn::Context<Self>) -> impl futures::Future<Output = ()> { async { } }
+#    }
 # }
-# enum UiEvent { PlayerInput(()), NewGame, Quit }
-# fn wait_for_input(_out: &mut (), _game: &MyGame) -> UiEvent { UiEvent::PlayerInput(()) }
+# mod ui {
+#    use crate::game::{MyGame, PlayerInput};
+#    pub enum UiEvent { PlayerInput(PlayerInput), NewGame, Quit }
+#    pub fn wait_for_input(_outcome: &Option<()>, _game: &MyGame) -> UiEvent { UiEvent::PlayerInput(PlayerInput::default()) }
+#    pub fn handle_event(_event : ()) { }
+# }
+use game::{MyGame, PlayerInput};
+use ui::{handle_event, UiEvent, wait_for_input};
+use posturn::{genawaiter::{self, Coroutine}, Host};
+use futures::pin_mut;
+
 fn main() {
-   // Every iteration of this loop starts a new game.
+   // NOTE: Every iteration of this loop will kick off a new play session.
    'new_game : loop {
-      // TODO: Change the current UI state to reflect that we're in a game.
 
-      // Set up the game.
-      let host = Host::new(MyGame::default());
+      // TODO: Show in the UI that we're now in a game.
 
-      // Call the MyGame coroutine to start playing.
-      let _co = host.play().unwrap();
+      // Set up.
+      let host = Host::new(MyGame::new());
 
-      let mut player_input = ();
+      // Start the first turn.
+      let co = host.play().unwrap();
+      pin_mut!(co);
+
+      let mut player_input = PlayerInput::default();
       let mut outcome = None;
 
-      // NOTE: This loop is awkward mainly because we have to pass in player_input on the first iteration,
-      // even though MyGame hasn't been prompted us for input!
-      while outcome.is_none() {
-         outcome = Some(());
+      loop {
+         // Take the next turn.
+         // NOTE: This loop is awkward. Why are we passing player_input on the first turn when there isn't any?
+         outcome = match co.as_mut().resume_with(player_input) {
+            genawaiter::GeneratorState::Yielded(event) => {
+               // Process event from game.
+               handle_event(event);
 
-         // Respond
-         match host.with_game(|game| wait_for_input(&mut Default::default(), &game)).unwrap() {
+               // The game is not over (yet).
+               None
+            },
+            genawaiter::GeneratorState::Complete(outcome) => {
+               // Game over!
+               Some(outcome)
+            },
+         };
+
+         // Keep rendering the UI until we receive player input.
+         // NOTE: with_game enables wait_for_input to access to the game state, which is required for drawing.
+         let ui_event = host.with_game(|game| wait_for_input(&outcome, &game));
+
+         match ui_event {
             UiEvent::PlayerInput(input) => {
-               // NOTE: Way down here is where we actually set player_input,
-               // after the player chooses to perform an action on their turn.
+               // NOTE: Way down here is where we actually receive player_input for the *next* turn.
                player_input = input;
             },
             UiEvent::NewGame => continue 'new_game, // The UI says we want to start a new game.
@@ -53,4 +85,4 @@ fn main() {
 }
 ```
 
-There are a couple things that currently make input and event processing cumbersome with `posturn`.
+Using this example, let's analyze some of the things that currently make `posturn` cumbersome to use.
