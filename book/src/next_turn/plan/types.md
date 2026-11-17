@@ -78,15 +78,20 @@ flowchart LR
 classDiagram
     direction TB
 
-    class Setup {
-        <<trait>>
-        type Outcome
-        +set_up(self, &mut Registry) AsyncFnOnce(CtxMut)
+    %% Generics that nest, or contain `()`, are written with HTML entities (`#lt;`, `#gt;`, `#40;`, `#41;`): Mermaid
+    %% misreads nested `~T~` generics as Markdown strikethrough, and treats any member containing `()` as a method.
+    %% Layout: the order of declarations and the direction of each arrow were tuned by measuring rendered variants for
+    %% size and edge crossings. Reordering lines or flipping arrows here can change the layout noticeably.
+
+    class Suspension["-Suspension"] {
+        <<enum>>
+        Event(event_type, done: event::Slot)
+        Request(request_type, status)
     }
 
     class Host~Outcome~ {
         -registry: Rc~Registry~
-        -game: Option~Pin~Box~dyn Future~~~
+        -game: Option#lt;Pin#lt;Box#lt;dyn Future#lt;Output = Outcome#gt;#gt;#gt;#gt;
         -poisoned: bool
         -started: bool
         +new(setup: Setup) Host
@@ -96,13 +101,14 @@ classDiagram
         +is_poisoned() bool
     }
 
-    class Suspension["-Suspension"] {
-        <<enum>>
-        Event(event_type, done: event::Slot)
-        Request(request_type, status)
+    class Setup {
+        <<trait>>
+        type Outcome
+        +set_up(self, &mut Registry) impl AsyncFnOnce#40;CtxMut#41; -#gt; Self::Outcome
     }
 
-    Host ..> Setup : new() consumes
+    Setup <.. Host : new() consumes
+    Host ..> Suspension : step() checks
 
     style Host fill:#4b2e6b,stroke:#b48cf0,stroke-width:2px,color:#ffffff
     style Setup fill:#4b2e6b,stroke:#b48cf0,stroke-width:2px,color:#ffffff
@@ -130,6 +136,8 @@ classDiagram
 classDiagram
     direction TB
 
+    %% Generics that nest, or contain `()`, are written with HTML entities (`#lt;`, `#gt;`, `#40;`, `#41;`): Mermaid
+    %% misreads nested `~T~` generics as Markdown strikethrough, and treats any member containing `()` as a method.
     %% Layout: the order of declarations and the direction of each arrow (e.g. `A <.. B` instead of `B ..> A`, which
     %% means the same thing) were tuned by measuring rendered variants for size and edge crossings. Reordering lines
     %% or flipping arrows here can change the layout noticeably.
@@ -234,6 +242,8 @@ See [Looking up modules](./host.md#looking-up-modules).
 classDiagram
     direction TB
 
+    %% Generics that nest, or contain `()`, are written with HTML entities (`#lt;`, `#gt;`, `#40;`, `#41;`): Mermaid
+    %% misreads nested `~T~` generics as Markdown strikethrough, and treats any member containing `()` as a method.
     %% Layout: the order of declarations and the direction of each arrow (e.g. `A <.. B` instead of `B ..> A`, which
     %% means the same thing) were tuned by measuring rendered variants for size and edge crossings. Reordering lines
     %% or flipping arrows here can change the layout noticeably.
@@ -254,7 +264,7 @@ classDiagram
 
     class Future["-Future"] {
         <<impl std::future::Future>>
-        type Output = ()
+        type Output = #40;#41;
         -done: Slot
     }
 
@@ -304,6 +314,8 @@ Events and requests are processed by separate types throughout. See
 classDiagram
     direction TB
 
+    %% Generics that nest, or contain `()`, are written with HTML entities (`#lt;`, `#gt;`, `#40;`, `#41;`): Mermaid
+    %% misreads nested `~T~` generics as Markdown strikethrough, and treats any member containing `()` as a method.
     %% Layout: the order of declarations and the direction of each arrow (e.g. `A <.. B` instead of `B ..> A`, which
     %% means the same thing) were tuned by measuring rendered variants for size and edge crossings. Reordering lines
     %% or flipping arrows here can change the layout noticeably.
@@ -342,7 +354,7 @@ classDiagram
     class Handle~T~ {
         -slot: Slot~T~
         -registry: Weak~Registry~
-        +resume(value: T) Result~(), T~
+        +resume(value: T) Result#lt;#40;#41;, T#gt;
         drop() abandons
     }
 
