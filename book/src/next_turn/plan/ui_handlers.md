@@ -1,58 +1,97 @@
 # Handing control to the UI
 
 The UI cannot `await` inside the game coroutine: it lives _outside_ the coroutine and is the thing that drives it. So
-the UI's link in the listener chain is not an `async` function. It is a plain callback that receives the event and a
+the UI's link in a listener chain is not an `async` function. It is a plain callback that receives the message and a
 **handle**. The UI stores the handle, carries on rendering and reading input across as many frames as it needs, and
 eventually uses the handle to let the game continue.
 
-## Two kinds of handle
+## `on_event` and `on_request`
 
-**Decided:** there are two handle types, and two registration methods, so that the compiler knows which one a callback
-receives:
+**Decided:** the UI registers its callbacks on the `Host`, with the same two method names the game uses on `Registry`.
+Events and requests each get their own kind of handle:
 
 ```rust,ignore
-// Notification events (Output = ()): the callback gets a `Suspend`.
-host.on_suspend(|ev: PartyMoved, suspend: Suspend| {
-   ui.start_walk_animation(ev.direction, suspend); // Resumes when the animation drops it.
+let mut host = Host::new(rpg::Setup::from_save(&save));
+
+// Events: the callback gets an `event::Handle`.
+host.on_event(|ctx: Ctx<'_>, ev: PartyMoved, handle: event::Handle| {
+   ui.borrow_mut().start_walk_animation(ev.direction, handle); // Resumes when the animation drops it.
 });
 
-// Every other event: the callback gets a `WaitForInput<E::Output>`.
-host.on_input(|ev: PartyInputRequested, wait: WaitForInput<PartyInput>| {
-   ui.prompt_party_action(wait); // Later: wait.resume(PartyInput::Rest { hours })
+// Requests: the callback gets a `request::Handle<R::Response>`.
+host.on_request(|ctx: Ctx<'_>, req: PartyInputRequested, handle: request::Handle<PartyInput>| {
+   ui.borrow_mut().prompt_party_action(handle); // Later: let _ = handle.resume(PartyInput::Rest { hours });
 });
 ```
 
-- `on_suspend` requires `E: Event<Output = ()>`. The callback is `FnMut(E, Suspend) + 'static`.
-- `on_input` takes any `E: Event`. The callback is `FnMut(E, WaitForInput<E::Output>) + 'static`.
+- `on_event<E: Event>(&mut self, ..)`: the callback is `FnMut(Ctx<'_>, E, event::Handle) + 'static`.
+- `on_request<R: Request>(&mut self, ..)`: the callback is `FnMut(Ctx<'_>, R, request::Handle<R::Response>) + 'static`.
 
-Stable Rust cannot select the handle type automatically from `E::Output`: a trait impl for `()` and a blanket impl
-for every other `T` would overlap without specialization. Hence the two methods.
+**Decided:** every UI callback receives a read-only [`Ctx`](./host.md#ctxa-the-read-only-view), so it can look up
+modules (for example, to find out what an animation should show) without going through shared UI state. This is
+safe: when a UI callback runs, every frame of the game is parked at an `emit`, `request`, or `next.run`, all of which
+hold `&mut CtxMut`, so the game holds no module borrows. The `Ctx` can't escape the callback, because of its
+lifetime.
 
-### `Suspend`
+Callbacks are `'static` and can't capture the `Host`, so the UI state they need is typically shared with the UI loop
+through an `Rc<RefCell<..>>` (the `ui` above).
 
-- `suspend.resume()` lets the game continue.
-- **Dropping a `Suspend` also resumes the game.** This makes "play an animation, then continue" trivial: whatever owns
-  the animation owns the `Suspend` and drops it when finished.
+Event and request suspensions are implemented separately, each with its own slot and `Future`; see
+[Under the hood](./coroutines.md).
 
-### `WaitForInput<R>`
+### `event::Handle`
 
-- `wait.resume(value: R)` supplies the output and lets the game continue. It consumes the handle, so a request is
-  answered at most once.
-- **Dropping a `WaitForInput<R>` without resuming is an error.** The drop marks the slot as _abandoned_; the next
-  `step()` panics with a message naming the event type, e.g.
-  `WaitForInput<PartyInput> for PartyInputRequested was dropped without being resumed`. (`Drop` itself does not
-  panic, because panicking during an unwind aborts the process.)
+- **`event::Handle` has no methods. Dropping it is what lets the game continue.** This makes "play an animation, then
+  continue" trivial: whatever owns the animation owns the `event::Handle` and drops it when finished. A UI that doesn't
+  need to pause for an event simply drops the handle in its callback.
+- Dropping an `event::Handle` can never be an error, since there is no response to forget.
+
+### `request::Handle<R>`
+
+- `handle.resume(value: R) -> Result<(), R>` supplies the response and lets the game continue. It consumes the handle,
+  so a request is answered at most once. If the `Host` has since been dropped (e.g. after "New Game"), it returns
+  `Err(value)` instead; see [Handles that outlive their `Host`](./coroutines.md#handles-that-outlive-their-host).
+- **Dropping a `request::Handle<R>` without resuming is an error.** The drop marks the slot as _abandoned_; the next
+  `step()` panics with a message naming the request type, e.g.
+  `request::Handle<PartyInput> for PartyInputRequested was dropped without being resumed`. (`Drop` itself does not
+  panic, because panicking during an unwind aborts the process.) Once the `Host` is gone there is no next `step()`,
+  so dropping a leftover handle is harmless.
+
+## Always at the bottom
+
+**Decided:** the UI callback for a message type sits in a dedicated slot at the **bottom** of that type's chain, below
+every game listener. Game listeners are registered during setup, inside `Host::new`, so they exist before the UI can
+register anything. A plain most-recent-first order would put the UI callback on top, which is why it gets its own
+slot.
+
+There is at most one UI callback per message type. Registering a second one for the same type panics.
+
+**Decided: UI callbacks must be registered before the first `step()`, and this is checked at runtime.** Calling
+`on_event` or `on_request` after the first `step()` panics with a message like "UI callbacks must be registered before
+the first `step()`". This catches a late registration at the call site, instead of letting it surface far away: an
+event the game emitted earlier would have [completed](./events.md#reaching-the-end-of-the-chain) without the UI ever
+seeing it, and a request it made earlier would already have panicked as unhandled. (A UI that wants to present the
+same message differently over time, say on different screens, registers one callback that dispatches to whatever is
+current.)
+
+A *missing* request callback still can't be detected up front, because `posturn` can't know which requests the game
+will make; it remains a clear panic naming the request type when the game first makes it.
+
+A UI doesn't need a callback for every event, only for the ones it presents. Every request the game can make, on the
+other hand, needs either a UI callback or a game listener that answers it.
 
 ## Resuming early
 
 A callback may resume its handle immediately, inside the callback. In that case the game never actually suspends:
-the UI handler's future is ready on its first poll, and the game carries on within the same `step()`. This is useful
+the UI callback's future is ready on its first poll, and the game carries on within the same `step()`. This is useful
 for UIs (or headless test harnesses, or AI players) that can answer synchronously.
 
 ## Under the hood
 
-Each UI callback is wrapped into an ordinary listener. When that listener runs, it creates a fresh slot, calls the
-callback with the event and a handle pointing at the slot, and then awaits a future on the slot. That future is
-`Pending` until the handle fills the slot. The host also records the slot as the session's _current suspension_, so
-the [driver](./driving.md) can tell whether stepping would make progress. See
-[Under the hood](./coroutines.md) for the slot itself.
+Each UI callback is wrapped into an ordinary listener, an `event::Listener` or `request::Listener` (holding the user's
+`FnMut` in a `RefCell`, since listeners are called through `Fn`), and stored in the registry's UI-callback map for its
+message type (see [Inside the `Registry`](./host.md#inside-the-registry)). When that listener runs, it creates a fresh
+slot, calls the callback with the message and a handle pointing at the slot, records the slot as the registry's _current
+suspension_, and then awaits a future on the slot. That future is `Pending` until the handle fills the slot. The `Host`
+checks the current suspension in [`step()`](./driving.md) to tell whether polling would make progress. See [Under the
+hood](./coroutines.md) for the slot itself.

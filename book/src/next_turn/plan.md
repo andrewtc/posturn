@@ -3,17 +3,27 @@
 > 🚧 This chapter is a living design document for `v0.4.0`. Decisions marked **Decided** are settled; anything under
 > [Open questions](./plan/open_questions.md) is not.
 
-`v0.4` replaces the `Play` trait, the game-state `Host`, and the `genawaiter` dependency with four pieces:
+`v0.4` replaces the `Play` trait, the old game-state `Host`, and the `genawaiter` dependency with these pieces:
 
-1. **Games are plain `async fn`s** written entirely by the user of the library. `posturn` does not define what a game
-   is; it only provides the machinery to run one. (See [Games are just `async fn`s](./plan/games.md).)
-2. **The `Host` is a registry of modules.** Each module is a separate piece of state, keyed by its type, that the UI
-   can inspect between turns. (See [The `Host` and modules](./plan/host.md).)
-3. **Events are types.** The game `emit`s an event and `await`s its typed output. Listeners registered on the `Host`
-   form a chain that can handle, override, or post-process each event. (See [Events and listeners](./plan/events.md).)
-4. **The UI is the bottom of the chain.** The UI registers plain callbacks that receive a `Suspend` or
-   `WaitForInput<R>` handle, which pauses the game until the UI is ready to continue. (See
-   [Handing control to the UI](./plan/ui_handlers.md).)
+1. **A `Setup` turns into the game.** Each game has a setup struct holding its inputs. Implementing the `Setup` trait
+   means registering the game's modules and returning the game itself as an `async` function, written entirely by the
+   user of the library. `posturn` does not define what a game is; it only provides the machinery to run one. (See
+   [Setting up a game](./plan/games.md).)
+2. **One registry, several views of it.** All shared state lives in a `Registry`, including the **modules**: separate
+   pieces of state, keyed by type, registered during setup. The UI creates a `Host<Outcome>` from a `Setup`; the host
+   runs the game and lets the UI read modules. The game owns the only `CtxMut`, through which it reads and writes
+   modules, emits events, and makes requests. A `Ctx` is a read-only view that any of them can hand out. They all look
+   up modules through the same `module::Borrow` / `module::BorrowMut` traits, and the borrow checker guarantees that no
+   module is borrowed while control passes between the UI and the game. (See [`Host`, contexts, and
+   modules](./plan/host.md).)
+3. **Events and requests are types.** The game `emit`s events (broadcasts, which implement `Event`) and makes `request`s
+   (which implement `Request` and resolve to a typed `Response`). Listeners registered during setup form a chain that
+   can handle, override, or post-process each message. (See [Events, requests, and listeners](./plan/events.md).)
+4. **The UI is the bottom of the chain.** The UI registers plain callbacks on the `Host` (also `on_event` and
+   `on_request`) that receive an `event::Handle` or `request::Handle<R>` handle, which pauses the game until the UI is
+   ready to continue. (See [Handing control to the UI](./plan/ui_handlers.md).)
+
+For a map of every type and how they relate, see [How the pieces fit](./plan/types.md).
 
 The rest of this chapter covers [driving the game](./plan/driving.md), the
 [coroutine machinery underneath](./plan/coroutines.md), a [worked example](./plan/example.md),
@@ -25,32 +35,36 @@ The rest of this chapter covers [driving the game](./plan/driving.md), the
 ```mermaid
 sequenceDiagram
     participant UI as UI loop
-    participant S as Session (driver)
+    participant H as Host
     participant G as game async fn
     participant L as listener chain
-    participant H as UI handler
+    participant C as UI callback
 
-    UI->>S: step()
-    S->>G: poll
-    G->>L: host.emit(PartyInputRequested).await
-    L->>L: higher-priority listeners run,<br/>each may call next.run(ev)
-    L->>H: on_input callback(ev, WaitForInput)
-    Note over H: UI stores the handle
-    H-->>S: game is now Pending
-    S-->>UI: Step::Waiting
-    Note over UI: render, read keys...
-    UI->>H: wait_for_input.resume(PartyInput::Move(..))
-    UI->>S: step()
-    S->>G: poll
-    H-->>L: PartyInput::Move(..)
+    UI->>H: step()
+    H->>G: poll
+    G->>L: ctx.request(PartyInputRequested).await
+    L->>L: higher-priority listeners run,<br/>each may call next.run(ctx, req)
+    L->>C: on_request callback(req, request::Handle)
+    Note over C: UI stores the handle
+    C-->>H: game is now Pending
+    H-->>UI: Poll::Pending
+    Note over UI: host.borrow(..) to render, read keys...
+    UI->>C: handle.resume(PartyInput::Move(..))
+    UI->>H: step()
+    H->>G: poll
+    C-->>L: PartyInput::Move(..)
     L-->>G: (possibly modified) PartyInput
-    Note over G: continues to next emit or returns
+    Note over G: continues to next emit/request or returns
 ```
 
 ## Hard constraints
 
 - **Single-threaded and cooperative.** No threads, no executor crate, no `Send`/`Sync` anywhere in the public API.
-  `Host`, handles, and the driver are deliberately `!Send` and `!Sync` (they are built on `Rc`).
+  `Host`, `CtxMut`, and the handles are deliberately `!Send` and `!Sync` (they are built on `Rc`).
 - **No dependencies.** `genawaiter` is removed and nothing replaces it.
 - **The caller drives the game by hand.** `posturn` never polls on its own.
-- **No `unsafe`** outside the standard no-op `Waker` construction.
+- **Borrowing mistakes are compile errors** where possible: holding a module borrow while the game suspends, or
+  while the UI steps the game, does not compile.
+- **No `unsafe`.** The module map is frozen when setup ends, so borrows come straight out of a fixed map.
+- **MSRV of Rust 1.86. Decided.** `AsyncFn` (async closures) and `Waker::noop()` need 1.85; trait upcasting
+  (`&dyn Module` to `&dyn Any`, as in the `module` patch) needs 1.86.
