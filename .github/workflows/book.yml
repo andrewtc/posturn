@@ -1,0 +1,88 @@
+# SPDX-FileCopyrightText: 2026 Andrew T. Christensen <andrew@andrewtc.com>
+#
+# SPDX-License-Identifier: MIT
+
+# Builds "The Rulebook" (the mdBook in `book/`) and publishes it to GitHub Pages whenever changes land on `main`.
+#
+# Supply-chain notes:
+# - Only GitHub's own `actions/*` actions are used, each pinned to the full commit SHA of a release (the tag is in the
+#   trailing comment). Update by resolving the new release tag to its commit SHA.
+# - mdBook and the mdbook-mermaid preprocessor are built from crates.io with `cargo install --locked` at exact versions
+#   (matching the versions used locally), so no third-party installer action or unverified binary download is needed.
+#   The built binaries are cached, keyed by those versions.
+# - Mermaid itself needs no install step: `book/mermaid.min.js` and `book/mermaid-init.js` are committed to the repo
+#   and loaded through `additional-js` in `book/book.toml`.
+
+name: Book
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+# Least privilege by default. The 'deploy' job adds only what GitHub Pages needs.
+permissions:
+  contents: read
+
+# Allow one deployment at a time, and let an in-progress deployment finish rather than cancelling it.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+env:
+  MDBOOK_VERSION: 0.5.3
+  MDBOOK_MERMAID_VERSION: 0.17.0
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Restore mdBook tools from cache
+        id: tools-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/bin/mdbook
+            ~/.cargo/bin/mdbook-mermaid
+          key: mdbook-${{ runner.os }}-${{ env.MDBOOK_VERSION }}-mermaid-${{ env.MDBOOK_MERMAID_VERSION }}
+
+      - name: Install mdBook and the Mermaid preprocessor
+        if: steps.tools-cache.outputs.cache-hit != 'true'
+        run: cargo install --locked "mdbook@${MDBOOK_VERSION}" "mdbook-mermaid@${MDBOOK_MERMAID_VERSION}"
+
+      - name: Show tool versions
+        run: |
+          mdbook --version
+          mdbook-mermaid --version
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+
+      - name: Build the book
+        run: mdbook build book
+
+      - name: Upload the book
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: book/book
+
+  deploy:
+    needs: build
+    # A manual run can start from any branch; only `main` is ever published.
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
