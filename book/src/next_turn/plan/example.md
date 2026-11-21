@@ -22,15 +22,15 @@ pub enum PartyInput {
 }
 
 /// A request: the game can't continue until it knows what the party does next.
-pub struct PartyInputRequested;
-impl Request for PartyInputRequested { type Response = PartyInput; }
+pub struct PartyInputRequest;
+impl Request for PartyInputRequest { type Response = PartyInput; }
 
 /// Events: declared explicitly with the `Event` marker trait.
-pub struct PartyMoved { pub direction: Direction }
-impl Event for PartyMoved {}
+pub struct PartyMovedEvent { pub direction: Direction }
+impl Event for PartyMovedEvent {}
 
-pub struct PartyRested { pub hours: NonZeroU8 }
-impl Event for PartyRested {}
+pub struct PartyRestedEvent { pub hours: NonZeroU8 }
+impl Event for PartyRestedEvent {}
 ```
 
 ## Setup
@@ -64,17 +64,17 @@ impl posturn::Setup for Setup {
 ```rust,ignore
 async fn play(mut ctx: CtxMut) -> Infallible {
    loop {
-      match ctx.request(PartyInputRequested).await {
+      match ctx.submit(PartyInputRequest).await {
          PartyInput::Move { direction } => {
             // A temporary borrow, dropped at the end of the statement.
             let moved = ctx.borrow_mut::<OverworldModule>().try_move(direction);
             if moved {
-               ctx.emit(PartyMoved { direction }).await;
+               ctx.emit(PartyMovedEvent { direction }).await;
             }
          }
          PartyInput::Rest { hours } => {
             ctx.borrow_mut::<OverworldModule>().time_of_day += GameDuration::hours(hours.get());
-            ctx.emit(PartyRested { hours }).await;
+            ctx.emit(PartyRestedEvent { hours }).await;
          }
          PartyInput::UseItem { item_idx } => {
             // Delegate to another subsystem's async logic.
@@ -84,7 +84,7 @@ async fn play(mut ctx: CtxMut) -> Infallible {
    }
 }
 
-async fn on_party_moved(ctx: &mut CtxMut, ev: PartyMoved, next: event::Next<PartyMoved>) {
+async fn on_party_moved(ctx: &mut CtxMut, ev: PartyMovedEvent, next: event::Next<PartyMovedEvent>) {
    ctx.borrow_mut::<OverworldModule>().time_of_day += GameDuration::minutes(1);
 
    // Scripts may play animations, ask questions, or start a battle before returning here.
@@ -99,7 +99,7 @@ async fn on_party_moved(ctx: &mut CtxMut, ev: PartyMoved, next: event::Next<Part
    }
 
    // Let the rest of the chain (ultimately, the UI's walk animation) see the move.
-   next.run(ctx, ev).await
+   next.forward(ctx, ev).await
 }
 ```
 
@@ -115,11 +115,11 @@ let mut host = Host::new(rpg::Setup::from_save(&save));
 
 // Bottom of each chain: the UI.
 let u = ui.clone();
-host.on_request(move |ctx, _: PartyInputRequested, handle| u.borrow_mut().prompt_party(ctx, handle));
+host.on_request(move |ctx, _: PartyInputRequest, handle| u.borrow_mut().prompt_party(ctx, handle));
 let u = ui.clone();
-host.on_event(move |_ctx, ev: PartyMoved, handle| u.borrow_mut().animate_walk(ev.direction, handle));
+host.on_event(move |_ctx, ev: PartyMovedEvent, handle| u.borrow_mut().animate_walk(ev.direction, handle));
 let u = ui.clone();
-host.on_event(move |_ctx, ev: PartyRested, handle| u.borrow_mut().fade_to_black(ev.hours, handle));
+host.on_event(move |_ctx, ev: PartyRestedEvent, handle| u.borrow_mut().fade_to_black(ev.hours, handle));
 
 loop {
    host.step(); // No-op while the UI still holds a handle.
@@ -144,20 +144,20 @@ impl<S: posturn::Setup> posturn::Setup for IceAndRest<S> {
       let game = self.0.set_up(registry);
 
       // Registered after the game's own listener, so it runs first.
-      registry.on_event(async |ctx: &mut CtxMut, ev: PartyMoved, next: event::Next<PartyMoved>| {
+      registry.on_event(async |ctx: &mut CtxMut, ev: PartyMovedEvent, next: event::Next<PartyMovedEvent>| {
          if ctx.borrow::<OverworldModule>().is_on_ice() {
             // Slide one extra tile, then let the default behavior run.
             ctx.borrow_mut::<OverworldModule>().try_move(ev.direction);
          }
-         next.run(ctx, ev).await
+         next.forward(ctx, ev).await
       });
 
       // Auto-rest when the party is exhausted, without ever showing the prompt.
-      registry.on_request(async |ctx: &mut CtxMut, req: PartyInputRequested, next| {
+      registry.on_request(async |ctx: &mut CtxMut, req: PartyInputRequest, next| {
          if ctx.borrow::<OverworldModule>().party_is_exhausted() {
             return PartyInput::Rest { hours: NonZeroU8::new(8).unwrap() };
          }
-         next.run(ctx, req).await
+         next.forward(ctx, req).await
       });
 
       game

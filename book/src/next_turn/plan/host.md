@@ -1,7 +1,8 @@
 # `Host`, contexts, and modules
 
-**Decided:** all shared state lives in one [`Registry`](#inside-the-registry): the **modules**, the
-[listener chains](./events.md), the UI callbacks, and the [current suspension](./coroutines.md#current-suspension).
+**Decided:** all shared state lives in one [`Registry`](#inside-the-registry): the **modules**, a
+[definition](./events.md#definitions-and-dispatch) for each event and request type (its game listeners and UI
+callback), and the [current suspension](./coroutines.md#current-suspension).
 During setup it is edited directly through `&mut Registry`; afterwards it is moved into an `Rc` and reached through
 handles. None of these types is ever `Send` or `Sync`.
 
@@ -15,7 +16,7 @@ handles. None of these types is ever `Send` or `Sync`.
 | [`module::BorrowMut`](#looking-up-modules) (write) | yes | yes | no | no: [read-only](#the-ui-only-reads) |
 | Inserts modules | `insert` (`&mut self`) | no | no | no |
 | Registers | game listeners: `on_event`, `on_request` (`&mut self`) | nothing | nothing | UI callbacks: `on_event`, `on_request` (`&mut self`) |
-| Hands over control | — | `emit(ev)`, `request(req)`, `next.run(ctx, msg)` (`&mut self`) | — | `step()` (`&mut self`) |
+| Hands over control | — | `emit(ev)`, `submit(req)`, `next.forward(ctx, msg)` (`&mut self`) | — | `step()` (`&mut self`) |
 
 ## Modules
 
@@ -135,9 +136,10 @@ game is the one the game asks for: answering a request through `request::Handle`
 while it steps the game. **The borrow checker enforces both.**
 
 - Module borrows take `&self`, on every type.
-- On the game side, everything that can suspend takes `&mut CtxMut`: `ctx.emit(..)`, `ctx.request(..)`, and
-  `next.run(ctx, ..)`. A `Ref`/`RefMut` (or a `Ctx` from `ctx.ctx()`) still alive at one of those is a compile error.
-  Because `CtxMut` is not `Clone` and only `Host::new` creates one, there is no second handle to borrow from instead.
+- On the game side, everything that can suspend takes `&mut CtxMut`: `ctx.emit(..)`, `ctx.submit(..)`, and
+  `next.forward(ctx, ..)`. A `Ref`/`RefMut` (or a `Ctx` from `ctx.ctx()`) still alive at one of those is a compile
+  error. Because `CtxMut` is not `Clone` and only `Host::new` creates one, there is no second handle to borrow from
+  instead.
 - On the UI side, `host.step()` takes `&mut self`, so a `Ref` from `host.borrow(..)` that is still alive at the next
   `step()` is a compile error.
 
@@ -145,8 +147,8 @@ A prototype confirmed that each of these violations is rejected:
 
 | Violation | Result |
 | --- | --- |
-| Game holds `ctx.borrow_mut::<M>()` across `ctx.emit(..).await` (or `ctx.request(..)`) | `E0502`: cannot borrow `ctx` as mutable because it is also borrowed as immutable |
-| Listener holds `ctx.borrow::<M>()` across `next.run(ctx, ev).await` | `E0502` on `*ctx` |
+| Game holds `ctx.borrow_mut::<M>()` across `ctx.emit(..).await` (or `ctx.submit(..)`) | `E0502`: cannot borrow `ctx` as mutable because it is also borrowed as immutable |
+| Listener holds `ctx.borrow::<M>()` across `next.forward(ctx, ev).await` | `E0502` on `*ctx` |
 | UI holds `host.borrow::<M>()` across `host.step()` | `E0502` on `host` |
 | Game clones `CtxMut` to get around the rule | `E0599`: no method named `clone` |
 
@@ -185,91 +187,68 @@ pub struct Host<Outcome> {
 
 `Host::new` creates a `Registry` by value, lets the [`Setup`](./games.md) edit it through `&mut Registry`, and then
 moves it into an `Rc`. **That move is the freeze:** no one can get a `&mut Registry` out of a shared `Rc`, so
-`insert`, `on_event`, and `on_request` on `Registry` can never be called again, and the compiler enforces it. Nothing
-else (no staging map, no `OnceCell`) is needed.
+`insert`, `on_event`, and `on_request` on `Registry` can never be called again, and the compiler enforces it. No staging
+map is needed.
 
 ```rust,ignore
 pub struct Registry {
-   /// One `RefCell<M>` per module type `M`. Fixed after setup, so `borrow` can hand out a `Ref<'_, M>` straight from
-   /// the map.
-   modules: TypeMap,
+   /// One module per type, keyed by the module's own type: `TypeId::of::<M>()`. Fixed after setup, so `borrow` can
+   /// hand out a `Ref<'_, M>` straight from the map.
+   modules: HashMap<TypeId, Box<RefCell<dyn Module>>>,
 
-   /// One `event::Chain<E>` (the game listeners) per event type `E`. Fixed after setup.
-   event_listeners: TypeMap,
+   /// One `event::Def<E>` per event type, keyed by the event's type: `TypeId::of::<E>()`.
+   events: RefCell<HashMap<TypeId, Rc<dyn event::AnyDef>>>,
 
-   /// One `request::Chain<R>` (the game listeners) per request type `R`. Fixed after setup.
-   request_listeners: TypeMap,
-
-   /// At most one `event::Listener<E>` (the UI callback) per event type `E`, registered by `Host::on_event`.
-   event_callbacks: RefCell<TypeMap>,
-
-   /// At most one `request::Listener<R>` (the UI callback) per request type `R`, registered by
-   /// `Host::on_request`.
-   request_callbacks: RefCell<TypeMap>,
+   /// One `request::Def<R>` per request type, keyed by the request's type: `TypeId::of::<R>()`.
+   requests: RefCell<HashMap<TypeId, Rc<dyn request::AnyDef>>>,
 
    /// The slot the game is currently parked on, if any. See "Under the hood".
    current: RefCell<Option<Suspension>>,
 }
-
-// In `posturn::event`:
-
-/// A listener for events of type `E`.
-type Listener<E> = Rc<dyn for<'a> Fn(&'a mut CtxMut, E, Next<E>) -> LocalBoxFuture<'a, ()>>;
-
-/// The game listeners for one event type, in registration order (the last one runs first).
-type Chain<E> = Rc<Vec<Listener<E>>>;
-
-// In `posturn::request`:
-
-/// A listener for requests of type `R`, producing its response.
-type Listener<R> = Rc<dyn for<'a> Fn(&'a mut CtxMut, R, Next<R>) -> LocalBoxFuture<'a, <R as Request>::Response>>;
-
-/// The game listeners for one request type, in registration order (the last one runs first).
-type Chain<R> = Rc<Vec<Listener<R>>>;
 ```
 
 Notes:
 
-- **Only three fields change after setup:** the two UI-callback maps (the `Host` registers callbacks after `new`) and
-  the current suspension. Everything else is never mutated once the `Registry` is in its `Rc`.
-- **UI callbacks are stored apart from the game's chains** rather than in a slot inside each chain, because the
-  chain maps are frozen: a UI callback for a message type with no game listeners would otherwise need a new map
-  entry after setup. Keeping them separate is also what puts the UI callback [at the
-  bottom](./ui_handlers.md#always-at-the-bottom) regardless of registration order.
-- **Each map is a [`TypeMap`](#typemap)** holding at most one value per type: the generic method that knows the
-  concrete type (`borrow::<M>`, `emit::<E>`, `request::<R>`) looks up `RefCell<M>`, `event::Chain<E>`, etc. directly.
-- **During setup, chains are uniquely owned**, so registering a listener pushes onto the `Vec` through `Rc::get_mut`.
-  Afterwards, `emit` and `request` clone the `Rc` as a cheap snapshot for `event::Next` / `request::Next`.
+- **Every map is a `HashMap<TypeId, _>` whose values are trait objects**, so only the right kind of thing can be
+  stored: a `dyn Module`, a `dyn event::AnyDef`, or a `dyn request::AnyDef`. Each value can be used through its trait
+  without downcasting (for example, `module.name()` in a panic message), and downcast to its concrete type after
+  lookup when needed (see [Storing modules and definitions](#storing-modules-and-definitions)).
+- **The key's source differs:** a module is keyed by **its own type** (`M`), while an event or request definition is
+  keyed by **the message type it handles** (`E` or `R`), not by the `Def` type.
+- **What changes after setup:** `modules` never does. `events` and `requests` sit in `RefCell`s only because
+  `Host::on_event` / `Host::on_request` may add a `Def` (holding just a UI callback) for a message type the game
+  registered no listeners for. Those maps are borrowed only long enough to clone an `Rc`, never across an `.await`.
+  Game listeners can't be added after setup, since registering them needs `&mut Registry`.
+- **Each `Def` holds its message's game listeners and its UI callback,** and dispatches itself; see
+  [Events, requests, and listeners](./events.md#definitions-and-dispatch).
 
-### `TypeMap`
+### Storing modules and definitions
 
-Each map in the `Registry` stores **at most one value per type**, and every value's type is unique to what it's for:
-`RefCell<M>` for module `M`, `event::Chain<E>` for event `E`, and so on. So each map can be keyed by the stored value's
-own type. **Decided:** `posturn` implements this small map itself rather than taking a dependency:
+**Modules.** `Module: Any`, so a module can be stored as `dyn Module` and still be downcast:
 
 ```rust,ignore
-// In `posturn::module` (private):
+// Registry::insert (setup only):
+let previous = self.modules.insert(TypeId::of::<M>(), Box::new(RefCell::new(module))); // coerces to dyn Module
+// A duplicate panics, naming the module with `name()`, a trait call that needs no downcast.
 
-/// A map holding at most one value of each type, keyed by that type.
-struct TypeMap(BTreeMap<TypeId, Box<dyn Any>>);
-
-impl TypeMap {
-   /// Stores `value`. Returns `false` (and stores nothing) if a `T` is already present.
-   fn insert<T: 'static>(&mut self, value: T) -> bool;
-
-   /// The stored `T`, if any.
-   fn get<T: 'static>(&self) -> Option<&T>;
-
-   /// The stored `T`, mutably. Only used during setup (to push a listener onto a chain).
-   fn get_mut<T: 'static>(&mut self) -> Option<&mut T>;
-}
+// Registry::borrow (behind `module::Borrow`):
+let cell = self.modules.get(&TypeId::of::<M>()).expect("module not registered");
+Ref::map(cell.borrow(), |m| (m as &dyn Any).downcast_ref::<M>().unwrap())
 ```
 
-The key is `TypeId::of::<T>()`. The `Box<dyn Any>` is what lets one map hold values of many different types; `get`
-turns an entry back into a `&T` with `downcast_ref`, which always succeeds because the key and the stored value have
-the same type. Looking up module `M` is therefore `modules.get::<RefCell<M>>()`, and event `E`'s chain is
-`event_listeners.get::<event::Chain<E>>()`.
+`m as &dyn Any` is trait upcasting (`&dyn Module` to `&dyn Any`), stable since Rust 1.86, the plan's MSRV. The
+downcast always succeeds because the map is keyed by `TypeId::of::<M>()`. `borrow_mut` is the same with
+`RefMut::map`.
 
-This is the same shape as the `AnyMap` from the [`anymap3`](https://docs.rs/anymap3) crate (whose default map, like
-ours, doesn't require `Send`), so switching to it later would be a drop-in change if `posturn` ever needs more, such as
-an `Entry` API.
+**Definitions.** `event::Def<E>` implements the private marker trait `event::AnyDef` (just `Any` plus the event's type
+name), so every `Def` fits in one map regardless of `E`; `request::Def<R>` and `request::AnyDef` likewise. Both
+dispatch and registration downcast the `Rc<dyn event::AnyDef>` to `Rc<event::Def<E>>` first, with
+`def.downcast::<E>()`: an inherent method on `dyn AnyDef` (like `downcast` on `dyn Any`) built on trait upcasting to
+`Rc<dyn Any>`. It always succeeds because the key is `TypeId::of::<E>()`. After that,
+everything is fully typed: `Def<E>::emit` takes an `E`, and `Def<R>::submit` takes an `R` and returns an
+`R::Response`, with no `Box<dyn Any>` in sight.
+
+**Why a `HashMap`, not a `HashSet` of trait objects?** A set would have to hash and compare entries by their
+`TypeId`, which means borrowing each module's `RefCell` to ask for it (and panicking if an unrelated module is
+mutably borrowed), and looking an entry up by `TypeId` would need a local wrapper type implementing
+`Borrow<TypeId>`. Keeping the `TypeId` as the map's key avoids both, with the same guarantees.

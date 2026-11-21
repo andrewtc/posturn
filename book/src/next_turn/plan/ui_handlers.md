@@ -14,12 +14,12 @@ Events and requests each get their own kind of handle:
 let mut host = Host::new(rpg::Setup::from_save(&save));
 
 // Events: the callback gets an `event::Handle`.
-host.on_event(|ctx: Ctx<'_>, ev: PartyMoved, handle: event::Handle| {
+host.on_event(|ctx: Ctx<'_>, ev: PartyMovedEvent, handle: event::Handle| {
    ui.borrow_mut().start_walk_animation(ev.direction, handle); // Resumes when the animation drops it.
 });
 
 // Requests: the callback gets a `request::Handle<R::Response>`.
-host.on_request(|ctx: Ctx<'_>, req: PartyInputRequested, handle: request::Handle<PartyInput>| {
+host.on_request(|ctx: Ctx<'_>, req: PartyInputRequest, handle: request::Handle<PartyInput>| {
    ui.borrow_mut().prompt_party_action(handle); // Later: let _ = handle.resume(PartyInput::Rest { hours });
 });
 ```
@@ -29,7 +29,7 @@ host.on_request(|ctx: Ctx<'_>, req: PartyInputRequested, handle: request::Handle
 
 **Decided:** every UI callback receives a read-only [`Ctx`](./host.md#ctxa-the-read-only-view), so it can look up
 modules (for example, to find out what an animation should show) without going through shared UI state. This is
-safe: when a UI callback runs, every frame of the game is parked at an `emit`, `request`, or `next.run`, all of which
+safe: when a UI callback runs, every frame of the game is parked at an `emit`, `submit`, or `next.forward`, all of which
 hold `&mut CtxMut`, so the game holds no module borrows. The `Ctx` can't escape the callback, because of its
 lifetime.
 
@@ -53,18 +53,20 @@ Event and request suspensions are implemented separately, each with its own slot
   `Err(value)` instead; see [Handles that outlive their `Host`](./coroutines.md#handles-that-outlive-their-host).
 - **Dropping a `request::Handle<R>` without resuming is an error.** The drop marks the slot as _abandoned_; the next
   `step()` panics with a message naming the request type, e.g.
-  `request::Handle<PartyInput> for PartyInputRequested was dropped without being resumed`. (`Drop` itself does not
+  `request::Handle<PartyInput> for PartyInputRequest was dropped without being resumed`. (`Drop` itself does not
   panic, because panicking during an unwind aborts the process.) Once the `Host` is gone there is no next `step()`,
   so dropping a leftover handle is harmless.
 
 ## Always at the bottom
 
 **Decided:** the UI callback for a message type sits in a dedicated slot at the **bottom** of that type's chain, below
-every game listener. Game listeners are registered during setup, inside `Host::new`, so they exist before the UI can
-register anything. A plain most-recent-first order would put the UI callback on top, which is why it gets its own
-slot.
+every game listener: the `ui` field of the message's [definition](./events.md#definitions-and-dispatch). Game
+listeners are registered during setup, inside `Host::new`, so they exist before the UI can register anything. A plain
+most-recent-first order would put the UI callback on top, which is why it gets its own slot.
 
-There is at most one UI callback per message type. Registering a second one for the same type panics.
+There is at most one UI callback per message type. The slot is a `OnceCell`, so registering a second one for the same
+type fails to `set` it, and `posturn` panics. If the game registered no listeners for a message type, `Host::on_event` /
+`Host::on_request` creates its definition, holding just the UI callback.
 
 **Decided: UI callbacks must be registered before the first `step()`, and this is checked at runtime.** Calling
 `on_event` or `on_request` after the first `step()` panics with a message like "UI callbacks must be registered before
@@ -89,8 +91,8 @@ for UIs (or headless test harnesses, or AI players) that can answer synchronousl
 ## Under the hood
 
 Each UI callback is wrapped into an ordinary listener, an `event::Listener` or `request::Listener` (holding the user's
-`FnMut` in a `RefCell`, since listeners are called through `Fn`), and stored in the registry's UI-callback map for its
-message type (see [Inside the `Registry`](./host.md#inside-the-registry)). When that listener runs, it creates a fresh
+`FnMut` in a `RefCell`, since listeners are called through `Fn`), and stored in the `ui` slot of its message type's
+[definition](./events.md#definitions-and-dispatch). When that listener runs, it creates a fresh
 slot, calls the callback with the message and a handle pointing at the slot, records the slot as the registry's _current
 suspension_, and then awaits a future on the slot. That future is `Pending` until the handle fills the slot. The `Host`
 checks the current suspension in [`step()`](./driving.md) to tell whether polling would make progress. See [Under the

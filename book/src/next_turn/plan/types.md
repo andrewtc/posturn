@@ -155,13 +155,6 @@ classDiagram
         +clone_module~M: Clone~() M
     }
 
-    class TypeMap["-TypeMap"] {
-        -0: BTreeMap#lt;TypeId, Box#lt;dyn Any#gt;#gt;
-        +insert~T~(value: T) bool
-        +get~T~() Option~&T~
-        +get_mut~T~() Option~&mut T~
-    }
-
     class BorrowMut {
         <<sealed trait>>
         +borrow_mut~M~() RefMut~M~
@@ -169,12 +162,10 @@ classDiagram
     }
 
     class Registry {
-        -modules: TypeMap
-        -event_listeners: TypeMap
-        -request_listeners: TypeMap
-        -event_callbacks: RefCell~TypeMap~
-        -request_callbacks: RefCell~TypeMap~
-        -current: RefCell~Option~Suspension~~
+        -modules: HashMap#lt;TypeId, Box#lt;RefCell#lt;dyn Module#gt;#gt;#gt;
+        -events: RefCell#lt;HashMap#lt;TypeId, Rc#lt;dyn event::AnyDef#gt;#gt;#gt;
+        -requests: RefCell#lt;HashMap#lt;TypeId, Rc#lt;dyn request::AnyDef#gt;#gt;#gt;
+        -current: RefCell#lt;Option#lt;Suspension#gt;#gt;
         +ctx() Ctx
         +insert(module)
         +on_event(listener)
@@ -190,15 +181,14 @@ classDiagram
         -0: Rc~Registry~
         +ctx() Ctx
         +emit(event)
-        +request(request) R::Response
+        +submit(request) R::Response
     }
 
-    Module "*" --o "1" Registry : keyed by type
+    Module "*" --o "1" Registry : keyed by its own type
     Borrow <|-- BorrowMut : extends
     Registry ..|> BorrowMut
     Registry <-- CtxMut : shares via Rc
     BorrowMut <|.. CtxMut
-    TypeMap "5" --* "1" Registry : modules, listeners, callbacks
     Registry <-- Ctx : borrows
     Ctx ..|> Borrow : read-only
 
@@ -207,30 +197,27 @@ classDiagram
     style Module fill:#2e5e30,stroke:#7fd082,stroke-width:2px,color:#ffffff
     style Borrow fill:#2e5e30,stroke:#7fd082,stroke-width:2px,color:#ffffff
     style BorrowMut fill:#2e5e30,stroke:#7fd082,stroke-width:2px,color:#ffffff
-    style TypeMap fill:#1a361b,stroke:#7fd082,stroke-width:2px,stroke-dasharray:6 4,color:#c8c8c8
     style Ctx fill:#2e5e30,stroke:#7fd082,stroke-width:2px,color:#ffffff
 ```
 
 See [Looking up modules](./host.md#looking-up-modules).
 
-- **`Registry`.** Holds all shared state: five `TypeMap`s (modules, game-listener chains, and UI callbacks) plus the
-  current suspension; see [Inside the `Registry`](./host.md#inside-the-registry). Users only see it as `&mut Registry`
-  during `set_up`, where they `insert` modules and register listeners with `on_event` / `on_request`. `Host::new` then
-  moves it into an `Rc`, which freezes it: no `&mut` access ever again. Implements both module traits.
+- **`Registry`.** Holds all shared state: modules, event and request definitions, and the current suspension, in
+  `HashMap`s keyed by `TypeId`; see [Inside the `Registry`](./host.md#inside-the-registry). Users only see it as
+  `&mut Registry` during `set_up`, where they `insert` modules and register listeners with `on_event` / `on_request`.
+  `Host::new` then moves it into an `Rc`, which freezes it: no `&mut` access ever again. Implements both module traits.
 - **`CtxMut`** (game side). A non-`Clone` newtype around the other `Rc<Registry>`; only `Host::new` creates one. It is
   handed to the game's async function by value. Implements both module traits. Module borrows take `&self`;
-  everything that can suspend (`emit`, `request`, and `run` on a `event::Next` / `request::Next`) takes `&mut self`, so
-  the game can't hold a borrow across a suspension.
-- **`Module`** (trait). A piece of game state published so that the UI can inspect it, such as `OverworldModule` or
-  `BattleModule`. One instance per type, each stored as a `RefCell<M>` in the `Registry`. Its only method, `name()`,
-  is for diagnostics and defaults to the type name, so `impl Module for MyModule {}` is usually enough.
+  everything that can suspend (`emit`, `submit`, and `forward` on an `event::Next` / `request::Next`) takes `&mut self`,
+  so the game can't hold a borrow across a suspension.
+- **`Module`** (trait, extends `Any`). A piece of game state published so that the UI can inspect it, such as
+  `OverworldModule` or `BattleModule`. One instance per type, stored as a `RefCell<dyn Module>` keyed by its own type,
+  and downcast after lookup. Its only method, `name()`, is for diagnostics and defaults to the type name, so
+  `impl Module for MyModule {}` is usually enough.
 - **`module::Borrow`** (sealed trait). Read access: `borrow`, `try_borrow`, `module`, `clone_module`. Implemented by
   `Registry`, `CtxMut`, `Ctx`, and `Host`, so all of them look up modules the same way.
 - **`module::BorrowMut`** (sealed trait, extends `module::Borrow`). Write access: `borrow_mut`, `try_borrow_mut`.
   Implemented by `Registry` and `CtxMut` only.
-- **`TypeMap`** (private). A map holding at most one value of each type, keyed by that type (e.g. one
-  `RefCell<M>` per module type), built on `BTreeMap<TypeId, Box<dyn Any>>`. The `Registry` holds five of them. See
-  [`TypeMap`](./host.md#typemap).
 - **`Ctx<'a>`.** A read-only, `Copy` view of the modules, obtained with `.ctx()` from a `Registry` or `CtxMut`, and
   handed to every UI callback by the `Host`. Implements `module::Borrow` only. Borrows its source, so it inherits the
   source's restrictions under the [borrowing rule](./host.md#the-borrowing-rule).
@@ -248,8 +235,16 @@ classDiagram
     %% means the same thing) were tuned by measuring rendered variants for size and edge crossings. Reordering lines
     %% or flipping arrows here can change the layout noticeably.
 
-    class Event {
-        <<marker trait>>
+    class Next~E~ {
+        -def: Rc#lt;Def#lt;E#gt;#gt;
+        -remaining: usize
+        -ui_done: bool
+        +forward(&mut CtxMut, event)
+    }
+
+    class Listener["-Listener#lt;E#gt;"] {
+        <<Box dyn Fn>>
+        +call(&mut CtxMut, E, Next~E~)
     }
 
     class Handle {
@@ -257,9 +252,24 @@ classDiagram
         drop() resumes
     }
 
-    class Listener["-Listener#lt;E#gt;"] {
-        <<Rc dyn Fn>>
-        +call(&mut CtxMut, E, Next~E~)
+    class Event {
+        <<marker trait>>
+    }
+
+    class AnyDef["-AnyDef"] {
+        <<trait: Any>>
+        +event_type() &'static str
+        +downcast~E~(self: Rc#lt;Self#gt;) Rc#lt;Def#lt;E#gt;#gt;
+    }
+
+    class Slot["-Slot"] {
+        <<Rc Cell bool>>
+    }
+
+    class Def["-Def#lt;E#gt;"] {
+        -listeners: Vec#lt;Listener#lt;E#gt;#gt;
+        -ui: OnceCell#lt;Listener#lt;E#gt;#gt;
+        +emit(self: Rc#lt;Self#gt;, &mut CtxMut, event: E)
     }
 
     class Future["-Future"] {
@@ -268,23 +278,19 @@ classDiagram
         -done: Slot
     }
 
-    class Next~E~ {
-        -chain: Chain~E~
-        -remaining: usize
-        -ui: Option~Listener~E~~
-        +run(&mut CtxMut, event)
-    }
-
-    class Slot["-Slot"] {
-        <<Rc Cell bool>>
-    }
-
-    Next --> Listener : calls the next one
-    Handle --> Slot : sets on drop
-    Next <.. Listener : receives
+    Listener "*" --* "1" Def : listeners + UI callback
+    Slot <-- Handle : sets on drop
     Slot <-- Future : waits on
+    Handle <.. Listener : UI callback creates
+    Listener ..> Next : receives
+    Event <.. Def : defines for
+    Def ..|> AnyDef
+    Future <.. Listener : UI callback awaits
+    Next --> Def : walks
 
     style Event fill:#1e4f7a,stroke:#6cb4f0,stroke-width:2px,color:#ffffff
+    style AnyDef fill:#112d46,stroke:#6cb4f0,stroke-width:2px,stroke-dasharray:6 4,color:#c8c8c8
+    style Def fill:#112d46,stroke:#6cb4f0,stroke-width:2px,stroke-dasharray:6 4,color:#c8c8c8
     style Listener fill:#112d46,stroke:#6cb4f0,stroke-width:2px,stroke-dasharray:6 4,color:#c8c8c8
     style Next fill:#1e4f7a,stroke:#6cb4f0,stroke-width:2px,color:#ffffff
     style Handle fill:#1e4f7a,stroke:#6cb4f0,stroke-width:2px,color:#ffffff
@@ -297,11 +303,17 @@ Events and requests are processed by separate types throughout. See
 
 - **`Event`** (marker trait). Declares a type as an event. Events are broadcast with `ctx.emit(ev).await`, which
   returns `()`.
-- **`event::Listener<E>`** (`Rc<dyn Fn(&mut CtxMut, E, event::Next<E>) -> LocalBoxFuture<()>>`). What an async function
-  or async closure registered with `Registry::on_event` is wrapped into. `Host::on_event` callbacks are wrapped into
-  one too.
-- **`event::Next<E>`.** The rest of the chain: a snapshot of the game listeners, how many remain, and the UI callback.
-  `next.run(ctx, ev)` calls the next one; at the end of the chain it simply returns.
+- **`event::Def<E>`** (private). The definition of event `E`: its game listeners (the last registered runs first) and
+  its UI callback (a `OnceCell`, so at most one), plus `emit`, which runs an `E` through them. Stored in the `Registry`
+  keyed by `TypeId::of::<E>()`. See [Definitions and dispatch](./events.md#definitions-and-dispatch).
+- **`event::AnyDef`** (private marker trait, `Any` plus `event_type()`). What the `Registry` stores every `Def<E>` as.
+  `ctx.emit` calls `downcast::<E>()` (an inherent method on `dyn AnyDef`) and then `Def<E>::emit` with the event,
+  fully typed.
+- **`event::Listener<E>`** (`Box<dyn Fn(&mut CtxMut, E, event::Next<E>) -> LocalBoxFuture<()>>`). What an async
+  function or async closure registered with `Registry::on_event` is wrapped into. `Host::on_event` callbacks are
+  wrapped into one too.
+- **`event::Next<E>`.** The rest of the chain: an `Rc` of the definition, how many game listeners remain, and whether
+  the UI callback has run. `next.forward(ctx, ev)` calls the next one; at the end of the chain it simply returns.
 - **`event::Handle`.** What a `Host::on_event` callback receives. It has no methods: dropping it lets the game continue.
 - **`event::Future`** (`Future<Output = ()>`). What the UI callback's listener awaits; ready once the `event::Handle` is
   dropped.
@@ -320,22 +332,39 @@ classDiagram
     %% means the same thing) were tuned by measuring rendered variants for size and edge crossings. Reordering lines
     %% or flipping arrows here can change the layout noticeably.
 
-    class Request {
-        <<trait>>
-        type Response
-    }
-
-    class Next~R~ {
-        -chain: Chain~R~
-        -remaining: usize
-        -ui: Option~Listener~R~~
-        +run(&mut CtxMut, request) R::Response
+    class Def["-Def#lt;R#gt;"] {
+        -listeners: Vec#lt;Listener#lt;R#gt;#gt;
+        -ui: OnceCell#lt;Listener#lt;R#gt;#gt;
+        +submit(self: Rc#lt;Self#gt;, &mut CtxMut, request: R) R::Response
     }
 
     class Future["-Future#lt;T#gt;"] {
         <<impl std::future::Future>>
         type Output = T
         -slot: Slot~T~
+    }
+
+    class Next~R~ {
+        -def: Rc#lt;Def#lt;R#gt;#gt;
+        -remaining: usize
+        -ui_done: bool
+        +forward(&mut CtxMut, request) R::Response
+    }
+
+    class AnyDef["-AnyDef"] {
+        <<trait: Any>>
+        +request_type() &'static str
+        +downcast~R~(self: Rc#lt;Self#gt;) Rc#lt;Def#lt;R#gt;#gt;
+    }
+
+    class Listener["-Listener#lt;R#gt;"] {
+        <<Box dyn Fn>>
+        +call(&mut CtxMut, R, Next~R~) R::Response
+    }
+
+    class Request {
+        <<trait>>
+        type Response
     }
 
     class Slot["-Slot#lt;T#gt;"] {
@@ -346,11 +375,6 @@ classDiagram
         Abandoned
     }
 
-    class Listener["-Listener#lt;R#gt;"] {
-        <<Rc dyn Fn>>
-        +call(&mut CtxMut, R, Next~R~) R::Response
-    }
-
     class Handle~T~ {
         -slot: Slot~T~
         -registry: Weak~Registry~
@@ -358,12 +382,19 @@ classDiagram
         drop() abandons
     }
 
-    Future --> Slot : takes the value from
+    Listener "*" --* "1" Def : listeners + UI callback
+    Def <-- Next : walks
     Next <.. Listener : receives
+    Handle <.. Listener : UI callback creates
+    AnyDef <|.. Def
+    Future --> Slot : takes the value from
+    Listener ..> Future : UI callback awaits
+    Request <.. Def : defines for
     Slot <-- Handle : fills or abandons
-    Next --> Listener : calls the next one
 
     style Request fill:#7a3e14,stroke:#f0a060,stroke-width:2px,color:#ffffff
+    style AnyDef fill:#46230b,stroke:#f0a060,stroke-width:2px,stroke-dasharray:6 4,color:#c8c8c8
+    style Def fill:#46230b,stroke:#f0a060,stroke-width:2px,stroke-dasharray:6 4,color:#c8c8c8
     style Listener fill:#46230b,stroke:#f0a060,stroke-width:2px,stroke-dasharray:6 4,color:#c8c8c8
     style Next fill:#7a3e14,stroke:#f0a060,stroke-width:2px,color:#ffffff
     style Handle fill:#7a3e14,stroke:#f0a060,stroke-width:2px,color:#ffffff
@@ -372,12 +403,16 @@ classDiagram
 ```
 
 - **`Request`** (trait). Implemented by each request type. Its associated `Response` is what
-  `ctx.request(req).await` resolves to.
-- **`request::Listener<R>`** (`Rc<dyn Fn(&mut CtxMut, R, request::Next<R>) -> LocalBoxFuture<R::Response>>`). What a
+  `ctx.submit(req).await` resolves to.
+- **`request::Def<R>`** (private). The definition of request `R`: its game listeners and UI callback, like
+  `event::Def`. Stored in the `Registry` keyed by `TypeId::of::<R>()`.
+- **`request::AnyDef`** (private marker trait, `Any` plus `request_type()`). What the `Registry` stores every `Def<R>`
+  as. `ctx.submit` calls `downcast::<R>()` and then `Def<R>::submit`, which returns an `R::Response`.
+- **`request::Listener<R>`** (`Box<dyn Fn(&mut CtxMut, R, request::Next<R>) -> LocalBoxFuture<R::Response>>`). What a
   listener registered with `Registry::on_request` is wrapped into. `Host::on_request` callbacks are wrapped into one
   too.
-- **`request::Next<R>`.** Like `event::Next`, but `next.run(ctx, req)` returns `R::Response`, and reaching the end of
-  the chain panics.
+- **`request::Next<R>`.** Like `event::Next`, but `next.forward(ctx, req)` returns `R::Response`, and reaching the end
+  of the chain panics.
 - **`request::Handle<T>`** (`T = R::Response`). What a `Host::on_request` callback receives. It must be consumed with
   `resume(value)`; dropping it without resuming abandons the request, and the next `step()` panics. If the `Host` is
   already gone, `resume` returns `Err(value)` instead.

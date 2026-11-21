@@ -3,7 +3,7 @@
 Out of scope for `v0.4`, but the design should not rule these out.
 
 - **Listener dependency language.** Instead of plain most-recent-first ordering, modules declare how their listeners
-  relate to other modules' listeners (e.g. "run before `BattleModule`'s handler for `TurnStarted`"), through a
+  relate to other modules' listeners (e.g. "run before `BattleModule`'s handler for `TurnStartedEvent`"), through a
   builder API or a procedural macro.
 - **Simultaneous input.** Several outstanding suspensions at once (e.g. both players choosing in `RoShamBo`), each
   resumed independently and in any order.

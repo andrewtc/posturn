@@ -149,7 +149,7 @@ enum Suspension {
    },
    /// Parked on a request; resumes once the `request::Handle` is resumed, and panics if it was abandoned.
    Request {
-      /// `std::any::type_name` of the request, e.g. for "request::Handle<PartyInput> for PartyInputRequested was
+      /// `std::any::type_name` of the request, e.g. for "request::Handle<PartyInput> for PartyInputRequest was
       /// dropped without being resumed".
       request_type: &'static str,
       /// The slot's state with `T` erased: is it waiting, filled, or abandoned?

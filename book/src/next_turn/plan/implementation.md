@@ -19,21 +19,25 @@ on those four.
    `request::Handle<T>` (abandons on drop), and `request::Future<T>`.
 4. **`posturn::module`, part 1** (`module.rs`): the `Module` trait (building on the `module` patch), the sealed
    `module::Borrow` / `module::BorrowMut` traits, and the read-only `Ctx<'a>` view.
-5. **`posturn::module`, part 2** (`module/registry.rs`): the private `TypeMap`, then `Registry`, with the fields from
-   [Inside the `Registry`](./host.md#inside-the-registry), `insert` (panics on a duplicate type), `on_event`,
-   `on_request`, `ctx()`, and both module traits.
+5. **`posturn::module`, part 2** (`module/registry.rs`): `Registry`, with the fields from
+   [Inside the `Registry`](./host.md#inside-the-registry): `HashMap`s keyed by `TypeId` holding `RefCell<dyn Module>`,
+   `Rc<dyn event::AnyDef>`, and `Rc<dyn request::AnyDef>`. Plus `insert` (panics on a duplicate type, naming it with
+   `Module::name`), `on_event`, `on_request`, `ctx()`, and both module traits (downcasting via trait upcasting).
 6. **`posturn::module`, part 3** (`module/ctx.rs`): `CtxMut`, the `Rc<Registry>` newtype with `ctx()`, `emit`,
-   `request`, and both module traits. Not `Clone`; constructible only inside the crate.
+   `submit`, and both module traits. Not `Clone`; constructible only inside the crate.
 7. **`posturn::host`, part 1** (`host/setup.rs`): the `Setup` trait.
-8. **`posturn::event` and `posturn::request`, part 2:** `event::Listener<E>` / `event::Next<E>` and
-   `request::Listener<R>` / `request::Next<R>`, each with `run(self, &mut CtxMut, msg)` and its own end-of-chain
-   behavior (unhandled events complete; unhandled requests panic).
+8. **`posturn::event` and `posturn::request`, part 2:** `event::Listener<E>`, `event::Def<E>` (listeners plus a
+   `OnceCell` UI callback, with a typed `emit` method), the private marker trait `event::AnyDef` (with an inherent
+   `downcast::<E>()` on `dyn AnyDef`), and
+   `event::Next<E>`; likewise `request::Listener<R>`, `request::Def<R>` (with `submit`), `request::AnyDef`, and
+   `request::Next<R>`. Each `Next` has `forward(self, &mut CtxMut, msg)` and
+   its own end-of-chain behavior (unhandled events complete; unhandled requests panic).
 9. **`posturn::host`, part 2** (`host.rs`): the `Suspension` enum and `Host<Outcome>` with:
    - `new`: runs `set_up` on a fresh `Registry`, moves it into an `Rc`, creates the `CtxMut`, and boxes the game;
    - `module::Borrow` (read-only);
-   - `on_event` and `on_request`: wrap callbacks into listeners stored in the UI-callback maps, pass them a `Ctx`, and
-     record the current `Suspension`; panic on a second callback for the same type, or on any registration after
-     the first `step()`;
+   - `on_event` and `on_request`: wrap callbacks into listeners set in their definition's `ui` slot (creating the
+     definition if needed), pass them a `Ctx`, and record the current `Suspension`; panic on a second callback for
+     the same type, or on any registration after the first `step()`;
    - `step` (returning `Poll<Outcome>`), with the no-op/abandoned/foreign-`Pending` rules from [Driving the
      game](./driving.md).
    - poisoning: a drop guard in `step` that marks the `Host` poisoned during an unwind, and `is_poisoned()`.
@@ -42,7 +46,7 @@ on those four.
 11. **Tests:**
    - Notification-only game (rewrite `RoShamBo`) completes with `event::Handle`s dropped immediately.
    - Typed request round trip through `Host::on_request`.
-   - Listener ordering: most recent first; `next.run` reaches lower listeners; the UI callback runs last even though
+   - Listener ordering: most recent first; `next.forward` reaches lower listeners; the UI callback runs last even though
      it is registered after setup.
    - Event chains and request chains are independent, even for the same type.
    - Override: a listener returns without calling `next`, so the UI callback never runs.
@@ -52,6 +56,10 @@ on those four.
    - An event with no listeners or UI callback completes without suspending.
    - Panics: unhandled request, abandoned `request::Handle`, foreign `Pending`, `step()` after `Done`, missing module.
    - `try_borrow` / `try_borrow_mut` return `None` for a module that was never registered.
+   - Emitting an event with no definition completes without suspending; submitting a request with no definition
+     panics, naming the request type.
+   - `dyn AnyDef::downcast` returns `Rc<Def<E>>` / `Rc<Def<R>>` for the message type a definition was registered
+     under.
    - A panicking listener (and a panicking UI callback) poisons the `Host`: `is_poisoned()` becomes `true`, the next
      `step()` panics with the poisoning message, and modules can still be read.
    - After the `Host` is dropped, `request::Handle::resume` returns `Err(value)`, and dropping a leftover

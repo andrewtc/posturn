@@ -12,13 +12,14 @@
 2. **One registry, several views of it.** All shared state lives in a `Registry`, including the **modules**: separate
    pieces of state, keyed by type, registered during setup. The UI creates a `Host<Outcome>` from a `Setup`; the host
    runs the game and lets the UI read modules. The game owns the only `CtxMut`, through which it reads and writes
-   modules, emits events, and makes requests. A `Ctx` is a read-only view that any of them can hand out. They all look
+   modules, emits events, and submits requests. A `Ctx` is a read-only view that any of them can hand out. They all look
    up modules through the same `module::Borrow` / `module::BorrowMut` traits, and the borrow checker guarantees that no
    module is borrowed while control passes between the UI and the game. (See [`Host`, contexts, and
    modules](./plan/host.md).)
-3. **Events and requests are types.** The game `emit`s events (broadcasts, which implement `Event`) and makes `request`s
-   (which implement `Request` and resolve to a typed `Response`). Listeners registered during setup form a chain that
-   can handle, override, or post-process each message. (See [Events, requests, and listeners](./plan/events.md).)
+3. **Events and requests are types.** The game `emit`s events (broadcasts, which implement `Event`) and `submit`s
+   requests (which implement `Request` and resolve to a typed `Response`). Listeners registered during setup form a
+   chain that can handle, override, or post-process each message. (See [Events, requests, and
+   listeners](./plan/events.md).)
 4. **The UI is the bottom of the chain.** The UI registers plain callbacks on the `Host` (also `on_event` and
    `on_request`) that receive an `event::Handle` or `request::Handle<R>` handle, which pauses the game until the UI is
    ready to continue. (See [Handing control to the UI](./plan/ui_handlers.md).)
@@ -42,8 +43,8 @@ sequenceDiagram
 
     UI->>H: step()
     H->>G: poll
-    G->>L: ctx.request(PartyInputRequested).await
-    L->>L: higher-priority listeners run,<br/>each may call next.run(ctx, req)
+    G->>L: ctx.submit(PartyInputRequest).await
+    L->>L: higher-priority listeners run,<br/>each may call next.forward(ctx, req)
     L->>C: on_request callback(req, request::Handle)
     Note over C: UI stores the handle
     C-->>H: game is now Pending

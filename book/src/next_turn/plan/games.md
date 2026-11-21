@@ -38,7 +38,7 @@ pub mod tic_tac_toe {
    }
 
    async fn play(setup: Setup, mut ctx: CtxMut) -> Outcome {
-      // Run turns by making requests and emitting events...
+      // Run turns by submitting requests and emitting events...
    }
 }
 
