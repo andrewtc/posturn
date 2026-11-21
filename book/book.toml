@@ -1,0 +1,17 @@
+# SPDX-FileCopyrightText: 2026 Andrew T. Christensen <andrew@andrewtc.com>
+#
+# SPDX-License-Identifier: MIT
+
+[book]
+title = "The Rulebook"
+authors = ["Andrew Thomas Christensen"]
+language = "en"
+
+[preprocessor.mermaid]
+command = "mdbook-mermaid"
+
+[output.html]
+additional-js = ["mermaid.min.js", "mermaid-init.js"]
+
+[rust]
+edition = "2021"

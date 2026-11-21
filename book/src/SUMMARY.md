@@ -1,0 +1,28 @@
+<!--
+SPDX-FileCopyrightText: 2026 Andrew T. Christensen <andrew@andrewtc.com>
+
+SPDX-License-Identifier: CC-BY-SA-4.0
+-->
+
+# Summary
+
+- [Design Philosophy](./philosophy.md)
+  - [Enter the turn-based game](./philosophy/anatomy.md)
+- [Next Turn](./next_turn.md)
+  - [Where we are](./next_turn/where_we_are.md)
+    - [Null input](./next_turn/null_input.md)
+    - [Input bloat](./next_turn/input_bloat.md)
+    - [Events vs. input](./next_turn/events_vs_input.md)
+    - [One big game state](./next_turn/shared_state.md)
+  - [The plan](./next_turn/plan.md)
+    - [How the pieces fit](./next_turn/plan/types.md)
+    - [Setting up a game](./next_turn/plan/games.md)
+    - [`Host`, contexts, and modules](./next_turn/plan/host.md)
+    - [Events, requests, and listeners](./next_turn/plan/events.md)
+    - [Handing control to the UI](./next_turn/plan/ui_handlers.md)
+    - [Driving the game](./next_turn/plan/driving.md)
+    - [Under the hood](./next_turn/plan/coroutines.md)
+    - [Worked example](./next_turn/plan/example.md)
+    - [Open questions](./next_turn/plan/open_questions.md)
+    - [Future work](./next_turn/plan/future_work.md)
+    - [Implementation steps](./next_turn/plan/implementation.md)
