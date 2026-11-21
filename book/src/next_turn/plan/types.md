@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 Andrew T. Christensen <andrew@andrewtc.com>
+
+SPDX-License-Identifier: CC-BY-SA-4.0
+-->
+
 # How the pieces fit
 
 This page is a map of every type in the plan and how they relate. Each type is described in more detail on its own

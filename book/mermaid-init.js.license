@@ -1,0 +1,5 @@
+SPDX-FileCopyrightText: Jan-Erik Rediger <janerik@fnordig.de>
+SPDX-License-Identifier: MPL-2.0
+
+From mdbook-mermaid 0.17.0 (https://github.com/badboy/mdbook-mermaid, `src/bin/assets/mermaid-init.js`), vendored
+unmodified by `mdbook-mermaid install`.

@@ -1,8 +1,19 @@
+<!--
+SPDX-FileCopyrightText: 2026 Andrew T. Christensen <andrew@andrewtc.com>
+
+SPDX-License-Identifier: CC-BY-SA-4.0
+-->
+
 # Driving the game
 
 The UI drives the game by hand through its `Host<Outcome>`, which owns the pinned, boxed game future and polls it with a
 no-op waker.
 
+<!--
+SPDX-SnippetBegin
+SPDX-SnippetCopyrightText: 2026 Andrew T. Christensen <andrew@andrewtc.com>
+SPDX-License-Identifier: MIT
+-->
 ```rust,ignore
 // Creating the host runs `set_up`, but doesn't poll the game yet.
 let mut host = Host::new(rpg::Setup::from_save(&save));
@@ -19,6 +30,7 @@ let outcome = loop {
    // ...but `overworld` must be dropped before the next `step()`, or this won't compile.
 };
 ```
+<!-- SPDX-SnippetEnd -->
 
 "New Game" means dropping the `Host` (which drops the game future, its `CtxMut`, and every module and listener) and
 creating a new one from a fresh `Setup`.

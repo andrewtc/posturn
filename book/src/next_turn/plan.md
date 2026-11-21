@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 Andrew T. Christensen <andrew@andrewtc.com>
+
+SPDX-License-Identifier: CC-BY-SA-4.0
+-->
+
 # The plan
 
 > 🚧 This chapter is a living design document for `v0.4.0`. Decisions marked **Decided** are settled; anything under

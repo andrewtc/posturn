@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 Andrew T. Christensen <andrew@andrewtc.com>
+
+SPDX-License-Identifier: CC-BY-SA-4.0
+-->
+
 # Where we are
 
 Before getting started, it's important to understand the current state of `posturn` and the key advantages it offers.
@@ -6,6 +12,11 @@ Before getting started, it's important to understand the current state of `postu
 
 For a framework that is all about event processing, the main game loop in `v0.3` of `posturn` leaves a lot to be desired. Let's take a look at a very simple example:
 
+<!--
+SPDX-SnippetBegin
+SPDX-SnippetCopyrightText: 2026 Andrew T. Christensen <andrew@andrewtc.com>
+SPDX-License-Identifier: MIT
+-->
 ```rust,no_run
 extern crate posturn;
 
@@ -84,5 +95,6 @@ fn main() {
    }
 }
 ```
+<!-- SPDX-SnippetEnd -->
 
 Using this example, let's analyze some of the things that currently make `posturn` cumbersome to use.

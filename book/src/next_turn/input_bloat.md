@@ -1,7 +1,18 @@
+<!--
+SPDX-FileCopyrightText: 2026 Andrew T. Christensen <andrew@andrewtc.com>
+
+SPDX-License-Identifier: CC-BY-SA-4.0
+-->
+
 # Input bloat
 
 You can imagine that a very small game like `TicTacToe` would have very simple inputs:
 
+<!--
+SPDX-SnippetBegin
+SPDX-SnippetCopyrightText: 2026 Andrew T. Christensen <andrew@andrewtc.com>
+SPDX-License-Identifier: MIT
+-->
 ```rust
 /// The player input for our TicTacToe game.
 struct Input {
@@ -12,6 +23,7 @@ struct Input {
    col : i8,
 }
 ```
+<!-- SPDX-SnippetEnd -->
 
 Each player taking a turn only needs to specify the position on the game board they want their next piece to occupy. Thus, the `Play` implementation can simply take this $$(x, y)$$ position as input. The UI is expected to supply this same type of input with every resume.
 
@@ -24,6 +36,11 @@ However, the real bugbear is that the complexity of the input structure grows ex
 
 When we are battling enemies, an action like "rest" may not even make sense. While navigating a dungeon, an input of "attack enemy 2" is similarly meaningless. Unfortunately, `posturn` only allows us to specify one `Input` type with which we can resume the game, so we end up with something like this:
 
+<!--
+SPDX-SnippetBegin
+SPDX-SnippetCopyrightText: 2026 Andrew T. Christensen <andrew@andrewtc.com>
+SPDX-License-Identifier: MIT
+-->
 ```rust
 # use std::time::Duration;
 # type Direction = ();
@@ -72,9 +89,15 @@ pub enum BattleInput {
    // …
 }
 ```
+<!-- SPDX-SnippetEnd -->
 
 Our `Input` structure is already complex, with multiple levels of nesting, and we only have two possible states of the game. Each time we resume the game, we have to pass a structure which mirrors the current state of the game, e.g. `Input::Battle(BattleInput::Attack(enemy_id))`, and the game has to filter out any inputs that don't make sense:
 
+<!--
+SPDX-SnippetBegin
+SPDX-SnippetCopyrightText: 2026 Andrew T. Christensen <andrew@andrewtc.com>
+SPDX-License-Identifier: MIT
+-->
 ```rust,ignore
 # extern crate posturn;
 # use std::time::Duration;
@@ -143,6 +166,7 @@ impl posturn::Play for RpgGame {
     }
 }
 ```
+<!-- SPDX-SnippetEnd -->
 
 We can make some of this complexity go away by defining `From`/`into` conversions which wrap or unwrap nested `enum` types. However, you can imagine how this `Input` structure would become increasingly unwieldy with each new feature we add to the game, e.g. a lock-picking minigame or overworld map.
 

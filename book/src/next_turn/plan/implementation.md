@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 Andrew T. Christensen <andrew@andrewtc.com>
+
+SPDX-License-Identifier: CC-BY-SA-4.0
+-->
+
 # Implementation steps
 
 The crate is organized to match the [groups in the type diagram](./types.md): every public type lives in one of

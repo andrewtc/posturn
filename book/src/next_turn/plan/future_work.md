@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 Andrew T. Christensen <andrew@andrewtc.com>
+
+SPDX-License-Identifier: CC-BY-SA-4.0
+-->
+
 # Future work
 
 Out of scope for `v0.4`, but the design should not rule these out.

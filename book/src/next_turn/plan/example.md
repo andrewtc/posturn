@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 Andrew T. Christensen <andrew@andrewtc.com>
+
+SPDX-License-Identifier: CC-BY-SA-4.0
+-->
+
 # Worked example
 
 An RPG with an overworld and a battle minigame, written against the planned API. This is the design target, not
@@ -5,6 +11,11 @@ compiling code yet.
 
 ## Modules, events, and requests
 
+<!--
+SPDX-SnippetBegin
+SPDX-SnippetCopyrightText: 2026 Andrew T. Christensen <andrew@andrewtc.com>
+SPDX-License-Identifier: MIT
+-->
 ```rust,ignore
 /// Overworld state the UI needs in order to draw the map.
 pub struct OverworldModule {
@@ -32,9 +43,15 @@ impl Event for PartyMovedEvent {}
 pub struct PartyRestedEvent { pub hours: NonZeroU8 }
 impl Event for PartyRestedEvent {}
 ```
+<!-- SPDX-SnippetEnd -->
 
 ## Setup
 
+<!--
+SPDX-SnippetBegin
+SPDX-SnippetCopyrightText: 2026 Andrew T. Christensen <andrew@andrewtc.com>
+SPDX-License-Identifier: MIT
+-->
 ```rust,ignore
 /// Everything needed to start (or resume) a playthrough.
 pub struct Setup {
@@ -58,9 +75,15 @@ impl posturn::Setup for Setup {
    }
 }
 ```
+<!-- SPDX-SnippetEnd -->
 
 ## The game
 
+<!--
+SPDX-SnippetBegin
+SPDX-SnippetCopyrightText: 2026 Andrew T. Christensen <andrew@andrewtc.com>
+SPDX-License-Identifier: MIT
+-->
 ```rust,ignore
 async fn play(mut ctx: CtxMut) -> Infallible {
    loop {
@@ -102,6 +125,7 @@ async fn on_party_moved(ctx: &mut CtxMut, ev: PartyMovedEvent, next: event::Next
    next.forward(ctx, ev).await
 }
 ```
+<!-- SPDX-SnippetEnd -->
 
 Every module borrow here ends before the next `await`. Writing, say,
 `let overworld = ctx.borrow_mut::<OverworldModule>();` and then awaiting an emit while `overworld` is still in use
@@ -109,6 +133,11 @@ would not compile.
 
 ## The UI
 
+<!--
+SPDX-SnippetBegin
+SPDX-SnippetCopyrightText: 2026 Andrew T. Christensen <andrew@andrewtc.com>
+SPDX-License-Identifier: MIT
+-->
 ```rust,ignore
 let ui = Rc::new(RefCell::new(Ui::new()));
 let mut host = Host::new(rpg::Setup::from_save(&save));
@@ -128,12 +157,18 @@ loop {
    ui.borrow_mut().update_and_render(&overworld); // May resume a stored handle.
 }
 ```
+<!-- SPDX-SnippetEnd -->
 
 ## A mod that overrides behavior
 
 Because listeners can only be registered during setup, a mod is naturally a `Setup` that wraps another one: it lets
 the inner setup register its modules and listeners first, then registers its own on top.
 
+<!--
+SPDX-SnippetBegin
+SPDX-SnippetCopyrightText: 2026 Andrew T. Christensen <andrew@andrewtc.com>
+SPDX-License-Identifier: MIT
+-->
 ```rust,ignore
 pub struct IceAndRest<S>(pub S);
 
@@ -166,3 +201,4 @@ impl<S: posturn::Setup> posturn::Setup for IceAndRest<S> {
 
 let mut host = Host::new(IceAndRest(rpg::Setup::from_save(&save)));
 ```
+<!-- SPDX-SnippetEnd -->

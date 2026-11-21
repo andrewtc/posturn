@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 Andrew T. Christensen <andrew@andrewtc.com>
+
+SPDX-License-Identifier: CC-BY-SA-4.0
+-->
+
 # Events, requests, and listeners
 
 The game communicates through two kinds of message, which are deliberately kept apart.
@@ -12,6 +18,11 @@ be **declared explicitly** by implementing the `Event` marker trait, so that onl
 emitted (and not, say, an arbitrary `Vec<HashSet<Widget>>`). Emitting one suspends the game until the event has been
 handled (for example, until the UI has finished animating it), and returns nothing:
 
+<!--
+SPDX-SnippetBegin
+SPDX-SnippetCopyrightText: 2026 Andrew T. Christensen <andrew@andrewtc.com>
+SPDX-License-Identifier: MIT
+-->
 ```rust,ignore
 /// Marks a type as an event that the game can emit.
 pub trait Event: 'static {}
@@ -22,12 +33,18 @@ impl Event for PartyMovedEvent {}
 
 ctx.emit(PartyMovedEvent { direction }).await; // -> ()
 ```
+<!-- SPDX-SnippetEnd -->
 
 ## Requests expect a response
 
 **Decided:** a **request** asks for something the game can't continue without, typically a player's decision. A
 request type implements `Request`, whose associated `Response` is what the game receives:
 
+<!--
+SPDX-SnippetBegin
+SPDX-SnippetCopyrightText: 2026 Andrew T. Christensen <andrew@andrewtc.com>
+SPDX-License-Identifier: MIT
+-->
 ```rust,ignore
 pub trait Request: 'static {
    /// What `ctx.submit(..)` resolves to.
@@ -44,6 +61,7 @@ match ctx.submit(PartyInputRequest).await {
    PartyInput::UseItem { item_idx } => { /* ... */ }
 }
 ```
+<!-- SPDX-SnippetEnd -->
 
 Together these solve [input bloat](../input_bloat.md), [null input](../null_input.md), and
 [events vs. input](../events_vs_input.md): every request has its own response type, events need no response at all,
@@ -71,6 +89,11 @@ Listeners are registered **only during [setup](./games.md)**, on `Registry`, wit
 game has started, the chains can't change. (The UI's own callbacks are registered on the `Host`, also with
 `on_event` and `on_request`; see [Handing control to the UI](./ui_handlers.md).)
 
+<!--
+SPDX-SnippetBegin
+SPDX-SnippetCopyrightText: 2026 Andrew T. Christensen <andrew@andrewtc.com>
+SPDX-License-Identifier: MIT
+-->
 ```rust,ignore
 fn set_up(self, registry: &mut Registry) -> impl AsyncFnOnce(CtxMut) -> Outcome + 'static {
    // An event listener, as an async fn item...
@@ -94,6 +117,7 @@ async fn on_party_moved(ctx: &mut CtxMut, ev: PartyMovedEvent, next: event::Next
    next.forward(ctx, ev).await
 }
 ```
+<!-- SPDX-SnippetEnd -->
 
 The bounds are:
 
@@ -149,6 +173,11 @@ concrete `Def<E>` / `Def<R>`, so `emit` and `submit` are ordinary methods with t
 `Response` types in their signatures, and no message is ever boxed as `dyn Any` (see
 [Storing modules and definitions](./host.md#storing-modules-and-definitions)).
 
+<!--
+SPDX-SnippetBegin
+SPDX-SnippetCopyrightText: 2026 Andrew T. Christensen <andrew@andrewtc.com>
+SPDX-License-Identifier: MIT
+-->
 ```rust,ignore
 // In `posturn::event` (all private except `Next`):
 
@@ -205,6 +234,7 @@ impl<E: Event> Next<E> {
    pub async fn forward(self, ctx: &mut CtxMut, event: E);
 }
 ```
+<!-- SPDX-SnippetEnd -->
 
 `ctx.emit(ev)`:
 
@@ -226,6 +256,11 @@ Each `Next` holds an `Rc` of the definition, so it's cheap to hand along and sta
 **Requests work the same way** in `posturn::request`: `request::Def<R>` holds `Listener<R>`s that return
 `R::Response`, and is stored as `Rc<dyn request::AnyDef>`:
 
+<!--
+SPDX-SnippetBegin
+SPDX-SnippetCopyrightText: 2026 Andrew T. Christensen <andrew@andrewtc.com>
+SPDX-License-Identifier: MIT
+-->
 ```rust,ignore
 impl<R: Request> Def<R> {
    async fn submit(self: Rc<Self>, ctx: &mut CtxMut, request: R) -> R::Response {
@@ -241,6 +276,7 @@ impl dyn AnyDef {
    fn downcast<R: Request>(self: Rc<Self>) -> Rc<Def<R>>;
 }
 ```
+<!-- SPDX-SnippetEnd -->
 
 `ctx.submit(req)` looks up and downcasts `R`'s definition the same way, then calls `def.submit(ctx, req)` and gets
 an `R::Response` back directly. With no definition, or at the end of the chain, an unhandled request panics, naming

@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 Andrew T. Christensen <andrew@andrewtc.com>
+
+SPDX-License-Identifier: CC-BY-SA-4.0
+-->
+
 # Handing control to the UI
 
 The UI cannot `await` inside the game coroutine: it lives _outside_ the coroutine and is the thing that drives it. So
@@ -10,6 +16,11 @@ eventually uses the handle to let the game continue.
 **Decided:** the UI registers its callbacks on the `Host`, with the same two method names the game uses on `Registry`.
 Events and requests each get their own kind of handle:
 
+<!--
+SPDX-SnippetBegin
+SPDX-SnippetCopyrightText: 2026 Andrew T. Christensen <andrew@andrewtc.com>
+SPDX-License-Identifier: MIT
+-->
 ```rust,ignore
 let mut host = Host::new(rpg::Setup::from_save(&save));
 
@@ -23,6 +34,7 @@ host.on_request(|ctx: Ctx<'_>, req: PartyInputRequest, handle: request::Handle<P
    ui.borrow_mut().prompt_party_action(handle); // Later: let _ = handle.resume(PartyInput::Rest { hours });
 });
 ```
+<!-- SPDX-SnippetEnd -->
 
 - `on_event<E: Event>(&mut self, ..)`: the callback is `FnMut(Ctx<'_>, E, event::Handle) + 'static`.
 - `on_request<R: Request>(&mut self, ..)`: the callback is `FnMut(Ctx<'_>, R, request::Handle<R::Response>) + 'static`.

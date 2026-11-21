@@ -1,9 +1,20 @@
+<!--
+SPDX-FileCopyrightText: 2026 Andrew T. Christensen <andrew@andrewtc.com>
+
+SPDX-License-Identifier: CC-BY-SA-4.0
+-->
+
 # Setting up a game
 
 **Decided:** `Play` is replaced by a much smaller trait, `Setup`. A type implementing `Setup` holds everything needed
 to start one game (board size, starting state, available choices, players...). Its one method registers the game's
 modules and listeners, and then turns the setup into the game itself: an `async` function that `posturn` will run.
 
+<!--
+SPDX-SnippetBegin
+SPDX-SnippetCopyrightText: 2026 Andrew T. Christensen <andrew@andrewtc.com>
+SPDX-License-Identifier: MIT
+-->
 ```rust,ignore
 pub trait Setup {
    /// What the game produces when it finishes.
@@ -14,9 +25,15 @@ pub trait Setup {
    fn set_up(self, registry: &mut Registry) -> impl AsyncFnOnce(CtxMut) -> Self::Outcome + 'static;
 }
 ```
+<!-- SPDX-SnippetEnd -->
 
 The intended usage is one setup type per game:
 
+<!--
+SPDX-SnippetBegin
+SPDX-SnippetCopyrightText: 2026 Andrew T. Christensen <andrew@andrewtc.com>
+SPDX-License-Identifier: MIT
+-->
 ```rust,ignore
 pub mod tic_tac_toe {
    pub struct Setup {
@@ -44,6 +61,7 @@ pub mod tic_tac_toe {
 
 let mut host = Host::new(tic_tac_toe::Setup { size: 3, first_player: Player::X }); // Host<Outcome>
 ```
+<!-- SPDX-SnippetEnd -->
 
 A game that never ends can use `!` (or `std::convert::Infallible` on stable) as its `Outcome`.
 
@@ -68,6 +86,11 @@ The `Registry` holds all shared state (its fields are listed under
 `module::BorrowMut`, so a setup can read or adjust modules it has already inserted, and it can hand out a read-only
 `Ctx` with `registry.ctx()` (see [Looking up modules](./host.md#looking-up-modules)).
 
+<!--
+SPDX-SnippetBegin
+SPDX-SnippetCopyrightText: 2026 Andrew T. Christensen <andrew@andrewtc.com>
+SPDX-License-Identifier: MIT
+-->
 ```rust,ignore
 impl Registry {
    /// Registers a module. Panics if a module of the same type was already inserted.
@@ -81,6 +104,7 @@ impl Registry {
       F: AsyncFn(&mut CtxMut, R, request::Next<R>) -> R::Response + 'static;
 }
 ```
+<!-- SPDX-SnippetEnd -->
 
 **Modules and listeners can only be registered during setup, and the compiler enforces it,** twice over:
 

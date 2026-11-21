@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 Andrew T. Christensen <andrew@andrewtc.com>
+
+SPDX-License-Identifier: CC-BY-SA-4.0
+-->
+
 # One big game state
 
 `v0.3` asks for the whole game to be a single type implementing `Play`. All state lives in that one value, behind a
@@ -19,6 +25,11 @@ It also makes composition awkward. There is no natural seam for splitting a game
 
 Nothing stops a game from holding a borrow across a yield:
 
+<!--
+SPDX-SnippetBegin
+SPDX-SnippetCopyrightText: 2026 Andrew T. Christensen <andrew@andrewtc.com>
+SPDX-License-Identifier: MIT
+-->
 ```rust,ignore
 let mut game = ctx.host.borrow_game_mut();
 game.take_turn(pos)?;
@@ -26,6 +37,7 @@ game.take_turn(pos)?;
 // The RefMut is still alive while the game is suspended...
 let pos = ctx.yield_event(next_event).await;
 ```
+<!-- SPDX-SnippetEnd -->
 
 This compiles. But while the game is suspended, the UI calls `host.with_game(...)` to render the board, and that
 panics at runtime because the game is still mutably borrowed. The same hazard exists in reverse: if the UI holds a

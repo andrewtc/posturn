@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 Andrew T. Christensen <andrew@andrewtc.com>
+
+SPDX-License-Identifier: CC-BY-SA-4.0
+-->
+
 # Enter the turn-based game
 Game developers who are used to writing e.g. first-person shooters tend to think of video games as real-time simulations. Such games are essentially in a perpetual "wait-for-input" state&mdash;an infinite loop in which the game processes input events from the OS, updates its state, and then re-renders itself. While this design lends itself well to real-time games, it makes assumptions that are not particularly helpful when writing a turn-based game.
 

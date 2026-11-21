@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 Andrew T. Christensen <andrew@andrewtc.com>
+
+SPDX-License-Identifier: CC-BY-SA-4.0
+-->
+
 # `Host`, contexts, and modules
 
 **Decided:** all shared state lives in one [`Registry`](#inside-the-registry): the **modules**, a
@@ -24,6 +30,11 @@ A module is a piece of game state that the UI is allowed to inspect, such as an 
 and party position, or a `BattleModule` holding the current battle. This builds on the work-in-progress `module`
 patch:
 
+<!--
+SPDX-SnippetBegin
+SPDX-SnippetCopyrightText: 2026 Andrew T. Christensen <andrew@andrewtc.com>
+SPDX-License-Identifier: MIT
+-->
 ```rust,ignore
 /// A piece of composable game state, published so that the UI can inspect it.
 pub trait Module: Any + 'static {
@@ -35,6 +46,7 @@ pub trait Module: Any + 'static {
 /// Most modules need nothing more than this:
 impl Module for OverworldModule {}
 ```
+<!-- SPDX-SnippetEnd -->
 
 - **Always available.** Modules are core to `posturn`, not behind a feature flag. **Decided.** (The `module` patch's
   `module` feature is dropped.)
@@ -49,6 +61,11 @@ impl Module for OverworldModule {}
 
 **Decided:** every type that can see modules offers the **same interface**, through two traits:
 
+<!--
+SPDX-SnippetBegin
+SPDX-SnippetCopyrightText: 2026 Andrew T. Christensen <andrew@andrewtc.com>
+SPDX-License-Identifier: MIT
+-->
 ```rust,ignore
 // In `posturn::module`:
 
@@ -68,7 +85,13 @@ pub trait BorrowMut: Borrow {
    fn try_borrow_mut<M: Module>(&self) -> Option<RefMut<'_, M>>;
 }
 ```
+<!-- SPDX-SnippetEnd -->
 
+<!--
+SPDX-SnippetBegin
+SPDX-SnippetCopyrightText: 2026 Andrew T. Christensen <andrew@andrewtc.com>
+SPDX-License-Identifier: MIT
+-->
 ```rust,ignore
 let overworld = ctx.borrow::<OverworldModule>();      // Ref<'_, OverworldModule>
 let mut battle = ctx.borrow_mut::<BattleModule>();    // RefMut<'_, BattleModule> (CtxMut / Registry only)
@@ -78,6 +101,7 @@ let mods = ctx.try_borrow::<ModSettings>();           // Option<Ref<'_, ModSetti
 
 let overworld = host.borrow::<OverworldModule>();     // from the UI, between steps (read-only)
 ```
+<!-- SPDX-SnippetEnd -->
 
 - **`try_` means "may be missing", not "may be borrowed".** Unlike `RefCell::try_borrow`, the `try_` variants only
   handle a module that was never registered, which is useful for optional modules (e.g. one that only some `Setup`s,
@@ -98,6 +122,11 @@ let overworld = host.borrow::<OverworldModule>();     // from the UI, between st
 
 ### `Ctx<'a>`: the read-only view
 
+<!--
+SPDX-SnippetBegin
+SPDX-SnippetCopyrightText: 2026 Andrew T. Christensen <andrew@andrewtc.com>
+SPDX-License-Identifier: MIT
+-->
 ```rust,ignore
 /// A read-only view of the modules. Cheap to copy; borrows from whatever it was obtained from.
 #[derive(Clone, Copy)]
@@ -106,6 +135,7 @@ pub struct Ctx<'a>(&'a Registry);
 impl Registry { pub fn ctx(&self) -> Ctx<'_>; }
 impl CtxMut { pub fn ctx(&self) -> Ctx<'_>; }
 ```
+<!-- SPDX-SnippetEnd -->
 
 A `Ctx` is what you pass to code that should only look: UI drawing helpers, the [UI callbacks](./ui_handlers.md), or
 game helpers that compute something from state without changing it. Because it borrows its source, it inherits that
@@ -166,6 +196,11 @@ What remains a runtime check: conflicting borrows of the **same** module within 
 
 `CtxMut` and `Host` are thin wrappers around a shared `Rc<Registry>`; `Ctx` is a plain reference to it:
 
+<!--
+SPDX-SnippetBegin
+SPDX-SnippetCopyrightText: 2026 Andrew T. Christensen <andrew@andrewtc.com>
+SPDX-License-Identifier: MIT
+-->
 ```rust,ignore
 /// The game's handle. Not `Clone`; only `Host::new` creates one.
 pub struct CtxMut(Rc<Registry>);
@@ -184,12 +219,18 @@ pub struct Host<Outcome> {
    started: bool,
 }
 ```
+<!-- SPDX-SnippetEnd -->
 
 `Host::new` creates a `Registry` by value, lets the [`Setup`](./games.md) edit it through `&mut Registry`, and then
 moves it into an `Rc`. **That move is the freeze:** no one can get a `&mut Registry` out of a shared `Rc`, so
 `insert`, `on_event`, and `on_request` on `Registry` can never be called again, and the compiler enforces it. No staging
 map is needed.
 
+<!--
+SPDX-SnippetBegin
+SPDX-SnippetCopyrightText: 2026 Andrew T. Christensen <andrew@andrewtc.com>
+SPDX-License-Identifier: MIT
+-->
 ```rust,ignore
 pub struct Registry {
    /// One module per type, keyed by the module's own type: `TypeId::of::<M>()`. Fixed after setup, so `borrow` can
@@ -206,6 +247,7 @@ pub struct Registry {
    current: RefCell<Option<Suspension>>,
 }
 ```
+<!-- SPDX-SnippetEnd -->
 
 Notes:
 
@@ -226,6 +268,11 @@ Notes:
 
 **Modules.** `Module: Any`, so a module can be stored as `dyn Module` and still be downcast:
 
+<!--
+SPDX-SnippetBegin
+SPDX-SnippetCopyrightText: 2026 Andrew T. Christensen <andrew@andrewtc.com>
+SPDX-License-Identifier: MIT
+-->
 ```rust,ignore
 // Registry::insert (setup only):
 let previous = self.modules.insert(TypeId::of::<M>(), Box::new(RefCell::new(module))); // coerces to dyn Module
@@ -235,6 +282,7 @@ let previous = self.modules.insert(TypeId::of::<M>(), Box::new(RefCell::new(modu
 let cell = self.modules.get(&TypeId::of::<M>()).expect("module not registered");
 Ref::map(cell.borrow(), |m| (m as &dyn Any).downcast_ref::<M>().unwrap())
 ```
+<!-- SPDX-SnippetEnd -->
 
 `m as &dyn Any` is trait upcasting (`&dyn Module` to `&dyn Any`), stable since Rust 1.86, the plan's MSRV. The
 downcast always succeeds because the map is keyed by `TypeId::of::<M>()`. `borrow_mut` is the same with

@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 Andrew T. Christensen <andrew@andrewtc.com>
+
+SPDX-License-Identifier: CC-BY-SA-4.0
+-->
+
 # Under the hood
 
 `posturn` builds its coroutine protocol directly on Rust's `async fn`. `.await` is the yield point and the game's
@@ -24,6 +30,11 @@ modules, a struct named `Future` shadows the standard trait, so the sketches bel
 
 An event suspension carries no value; the only question is whether the UI is done with it.
 
+<!--
+SPDX-SnippetBegin
+SPDX-SnippetCopyrightText: 2026 Andrew T. Christensen <andrew@andrewtc.com>
+SPDX-License-Identifier: MIT
+-->
 ```rust,ignore
 /// `posturn::event::Slot` (private). Shared between a `Handle` and its `Future`; `true` once the `Handle` has been
 /// dropped.
@@ -47,6 +58,7 @@ impl std::future::Future for Future {
    }
 }
 ```
+<!-- SPDX-SnippetEnd -->
 
 "Play an animation, then continue" is therefore just: whatever owns the animation owns the `event::Handle`, and drops it
 when the animation finishes. A UI that doesn't need to pause for an event drops the handle inside the callback.
@@ -55,6 +67,11 @@ when the animation finishes. A UI that doesn't need to pause for an event drops 
 
 A request suspension must deliver exactly one value, and it can be abandoned.
 
+<!--
+SPDX-SnippetBegin
+SPDX-SnippetCopyrightText: 2026 Andrew T. Christensen <andrew@andrewtc.com>
+SPDX-License-Identifier: MIT
+-->
 ```rust,ignore
 /// `posturn::request::State` (private).
 enum State<T> {
@@ -117,6 +134,7 @@ impl<T> std::future::Future for Future<T> {
    }
 }
 ```
+<!-- SPDX-SnippetEnd -->
 
 Neither handle is `Clone` or `Send`: there is exactly one continuation per suspension.
 
@@ -139,6 +157,11 @@ writes `let _ = handle.resume(value);` (or `.ok()`); one that does can, say, dis
 So that `step()` can avoid polling when nothing would change, the registry ([`Registry`](./host.md#inside-the-registry),
 shared by `Host` and `CtxMut`) records what the game is currently parked on. The two cases stay separate here too:
 
+<!--
+SPDX-SnippetBegin
+SPDX-SnippetCopyrightText: 2026 Andrew T. Christensen <andrew@andrewtc.com>
+SPDX-License-Identifier: MIT
+-->
 ```rust,ignore
 enum Suspension {
    /// Parked on an event; resumes once the `event::Handle` is dropped.
@@ -159,6 +182,7 @@ enum Suspension {
 
 enum RequestStatus { Waiting, Filled, Abandoned }
 ```
+<!-- SPDX-SnippetEnd -->
 
 Before polling, `step()` checks it:
 

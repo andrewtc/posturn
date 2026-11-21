@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 Andrew T. Christensen <andrew@andrewtc.com>
+
+SPDX-License-Identifier: CC-BY-SA-4.0
+-->
+
 # Events vs. input
 
 In `v0.3`, a game has exactly one way to hand control back to the main program: `ctx.yield_event(event)`. Every
