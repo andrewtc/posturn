@@ -23,3 +23,6 @@ Cargo.lock
 # Ignore IDE-related files.
 .idea
 .vscode
+
+# Local Claude Code files.
+.claude
