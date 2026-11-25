@@ -17,7 +17,7 @@ SPDX-License-Identifier: MIT
 ```rust,ignore
 // Creating the host runs `set_up`, but doesn't poll the game yet.
 let mut host = Host::new(rpg::Setup::from_save(&save));
-register_ui_callbacks(&mut host, &ui);
+let overworld_screen = OverworldScreen::open(&host, &ui); // Registers the UI's listeners.
 
 let outcome = loop {
    if let Poll::Ready(outcome) = host.step() {
@@ -26,7 +26,7 @@ let outcome = loop {
 
    // Between steps the UI may borrow modules freely...
    let overworld = host.borrow::<OverworldModule>();
-   ui.borrow_mut().update_and_render(&overworld); // ...and may resume a stored handle.
+   ui.borrow_mut().update_and_render(&overworld); // ...and may use a stored resume handle.
    // ...but `overworld` must be dropped before the next `step()`, or this won't compile.
 };
 ```
@@ -40,13 +40,13 @@ creating a new one from a fresh `Setup`.
 `step(&mut self) -> Poll<Outcome>`:
 
 - **If the `Host` is [poisoned](#when-something-panics)**, `step()` panics immediately with a clear message.
-- **If there is a current suspension and its handle has not been resumed, `step()` does nothing** and returns
-  `Poll::Pending`. The UI can call `step()` every frame without tracking the handle's state itself.
-- **If the current suspension was abandoned** (a `request::Handle` was dropped without resuming), `step()` panics with a
-  message naming the event type.
+- **If there is a current suspension and its resume handle hasn't been used, `step()` does nothing** and returns
+  `Poll::Pending`. The UI can call `step()` every frame without tracking the resume handle's state itself.
+- **If the current suspension was abandoned** (a `request::Resume` was dropped without being used), `step()` panics
+  with a message naming the request type.
 - **Otherwise it polls the game future once.** Within that single poll the game runs as far as it can: through any
-  number of emits and requests whose UI callbacks resume immediately, until it either:
-  - reaches a UI callback that keeps its handle, so the future returns `Pending` and `step()` returns
+  number of emits and requests whose host listeners resume immediately, until it either:
+  - reaches a host listener that keeps its resume handle, so the future returns `Pending` and `step()` returns
     `Poll::Pending`, or
   - finishes, and `step()` returns `Poll::Ready(output)`.
 - **If the future returns `Pending` without a posturn suspension**, the game awaited something posturn did not create
@@ -54,12 +54,12 @@ creating a new one from a fresh `Setup`.
 - Calling `step()` again after it has returned `Poll::Ready` panics.
 
 This also removes the [null input](../null_input.md) problem: the first `step()` takes no input, because the game
-always _asks_ for input through an event.
+always _asks_ for input through a request.
 
 ## When something panics
 
-**Decided:** a panic anywhere in the game (the game's async function, a listener, or a UI callback, all of which run
-inside `step()`) **propagates** out of `step()` to the UI loop, and **poisons** the `Host`.
+**Decided:** a panic anywhere in the game (the game's async function, a game listener, or a host listener, all of which
+run inside `step()`) **propagates** out of `step()` to the UI loop, and **poisons** the `Host`.
 
 - While polling, `step()` holds a small guard. If the guard is dropped during an unwind
   (`std::thread::panicking()`), it marks the `Host` as poisoned. No `catch_unwind` and no `UnwindSafe` bounds are
@@ -80,9 +80,9 @@ With `panic = "abort"`, none of this applies: the process ends at the first pani
 ## Why `Poll`?
 
 **Decided:** `step()` returns the standard `std::task::Poll<Outcome>` rather than a dedicated enum. It has exactly the
-right shape: `Poll::Pending` while the UI still holds a handle, and `Poll::Ready(out)` once the game has finished.
-It's also familiar to anyone who knows Rust's `Future`s, which is fitting, since `step()` is a thin wrapper around
-polling the game future.
+right shape: `Poll::Pending` while the UI still holds a resume handle, and `Poll::Ready(out)` once the game has
+finished. It's also familiar to anyone who knows Rust's `Future`s, which is fitting, since `step()` is a thin wrapper
+around polling the game future.
 
 ## One suspension at a time
 
