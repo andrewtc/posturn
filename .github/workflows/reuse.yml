@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2024 Andrew T. Christensen <andrew@andrewtc.com>
 #
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: MIT OR Apache-2.0
 
 name: REUSE
 on:
