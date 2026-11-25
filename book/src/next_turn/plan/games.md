@@ -47,7 +47,10 @@ pub mod tic_tac_toe {
       fn set_up(self, registry: &mut Registry) -> impl AsyncFnOnce(CtxMut) -> Outcome + 'static {
          registry.insert(Board::new(self.size));
          registry.insert(Turn(self.first_player));
-         registry.on_event(on_piece_placed);
+
+         // `forever` gives up the handle, so the listener stays registered for the whole game.
+         // (`PiecePlacedEvent` has `type Priority = ()`, so only registration order decides its listeners' order.)
+         registry.on_event((), on_piece_placed).forever();
 
          // The implementor decides how to express the game: an async closure, or a separate async fn.
          async move |ctx: CtxMut| play(self, ctx).await
@@ -70,19 +73,19 @@ A game that never ends can use `!` (or `std::convert::Infallible` on stable) as 
 `Host::new<S: Setup<Outcome = Outcome>>(setup: S) -> Host<Outcome>`:
 
 1. Creates an empty `Registry` by value.
-2. Calls `setup.set_up(&mut registry)`. The setup inserts every module the game will ever have and registers every
-   game listener, editing the `Registry` directly.
-3. **Freezes** it by moving it into an `Rc<Registry>`. Nobody can get a `&mut Registry` back out of a shared `Rc`, so
-   from here on no module or game listener can be added.
+2. Calls `setup.set_up(&mut registry)`. The setup inserts every module the game will ever have and registers the
+   game's initial listeners, editing the `Registry` directly.
+3. **Freezes** the modules by moving the `Registry` into an `Rc<Registry>`. Nobody can get a `&mut Registry` back out
+   of a shared `Rc`, so from here on no module can be added. (Listeners can be: registering one takes only `&self`.)
 4. Creates the game's one and only `CtxMut` (wrapping a clone of that `Rc`) and calls the returned async function with
    it, producing the game future. The `Host` keeps the other `Rc`.
 5. Pins and boxes that future inside the `Host`. Nothing is polled until the first [`step()`](./driving.md).
 
 ## `Registry`
 
-The `Registry` holds all shared state (its fields are listed under
-[Inside the `Registry`](./host.md#inside-the-registry)). The user only ever sees it as `&mut Registry` during
-`set_up`, where its job is registering modules and listeners. It also implements `module::Borrow` and
+The `Registry` holds all shared state (its fields are listed under [Inside the
+`Registry`](./host.md#inside-the-registry)). The user only ever sees it as `&mut Registry` during `set_up`, where its
+job is inserting modules and registering the game's initial listeners. It also implements `module::Borrow` and
 `module::BorrowMut`, so a setup can read or adjust modules it has already inserted, and it can hand out a read-only
 `Ctx` with `registry.ctx()` (see [Looking up modules](./host.md#looking-up-modules)).
 
@@ -96,30 +99,37 @@ impl Registry {
    /// Registers a module. Panics if a module of the same type was already inserted.
    pub fn insert<M: Module>(&mut self, module: M);
 
-   /// Registers a game listener for an event type. See "Events, requests, and listeners".
-   pub fn on_event<E: Event, F>(&mut self, listener: F) where F: AsyncFn(&mut CtxMut, E, event::Next<E>) + 'static;
+   /// Registers a game listener for an event type, and returns the handle that keeps it registered. See "Events,
+   /// requests, and listeners".
+   pub fn on_event<E: Event, F>(&self, priority: E::Priority, listener: F) -> event::Handle where
+      F: AsyncFn(&mut CtxMut, E, event::Next<E>) + 'static;
 
    /// Registers a game listener for a request type.
-   pub fn on_request<R: Request, F>(&mut self, listener: F) where
+   pub fn on_request<R: Request, F>(&self, priority: R::Priority, listener: F) -> request::Handle where
       F: AsyncFn(&mut CtxMut, R, request::Next<R>) -> R::Response + 'static;
 }
 ```
 <!-- SPDX-SnippetEnd -->
 
-**Modules and listeners can only be registered during setup, and the compiler enforces it,** twice over:
+**Modules can only be inserted during setup, and the compiler enforces it,** twice over:
 
 - `set_up` only _borrows_ the `Registry`, so the `'static` async function it returns can't hold on to it. Trying to
-  capture it (for example, to insert a module or reorder listeners later in the game) fails to compile with "lifetime
-  may not live long enough".
+  capture it (for example, to insert a module later in the game) fails to compile with "lifetime may not live long
+  enough".
 - After setup the `Registry` lives in an `Rc`, which never hands out `&mut`. Neither `Host` nor `CtxMut` has an
-  `insert` method, and `CtxMut` has no way to register listeners. (The `Host` registers only the UI's callbacks, which
-  always sit at the bottom of each chain; see [Handing control to the UI](./ui_handlers.md#always-at-the-bottom).)
+  `insert` method.
+
+**Listeners are not restricted to setup.** Registering during setup is just the earliest chance; the game and its
+modules can register more at any time through `CtxMut`, and the UI through the `Host` (see
+[Events, requests, and listeners](./events.md#listeners-form-a-chain)). A listener the game registers during setup
+either gives up its [handle](./events.md#handles) with `.forever()`, or keeps it in a module, which lives exactly as
+long as the game.
 
 A consequence: a module that only matters part of the time (say, a `BattleModule`) is inserted up front in an empty
 state, e.g. with `current_battle: None`.
 
 Because the module map never changes after setup, borrowing a module returns a `Ref` straight out of a fixed
-`BTreeMap`. **No `unsafe` is needed.**
+`HashMap`. **No `unsafe` is needed.**
 
 ## Why return an async function rather than a `Future`?
 

@@ -23,12 +23,14 @@ SPDX-License-Identifier: CC-BY-SA-4.0
    module is borrowed while control passes between the UI and the game. (See [`Host`, contexts, and
    modules](./plan/host.md).)
 3. **Events and requests are types.** The game `emit`s events (broadcasts, which implement `Event`) and `submit`s
-   requests (which implement `Request` and resolve to a typed `Response`). Listeners registered during setup form a
-   chain that can handle, override, or post-process each message. (See [Events, requests, and
+   requests (which implement `Request` and resolve to a typed `Response`). Listeners, registered at any time with a
+   priority, form a chain for each message type that can handle, override, or post-process each message. Registering
+   one returns a handle, and dropping the handle unregisters the listener. (See [Events, requests, and
    listeners](./plan/events.md).)
-4. **The UI is the bottom of the chain.** The UI registers plain callbacks on the `Host` (also `on_event` and
-   `on_request`) that receive an `event::Handle` or `request::Handle<R>` handle, which pauses the game until the UI is
-   ready to continue. (See [Handing control to the UI](./plan/ui_handlers.md).)
+4. **The UI joins the chain.** The UI registers plain (non-`async`) listeners on the `Host` (also `on_event` and
+   `on_request`), which are sorted into the same chains by priority. Each receives an `event::Resume` or
+   `request::Resume<T>`, which keeps the game paused until the UI is ready to continue. (See [Handing control to the
+   UI](./plan/ui_handlers.md).)
 
 For a map of every type and how they relate, see [How the pieces fit](./plan/types.md).
 
@@ -45,18 +47,18 @@ sequenceDiagram
     participant H as Host
     participant G as game async fn
     participant L as listener chain
-    participant C as UI callback
+    participant C as host listener
 
     UI->>H: step()
     H->>G: poll
     G->>L: ctx.submit(PartyInputRequest).await
     L->>L: higher-priority listeners run,<br/>each may call next.forward(ctx, req)
-    L->>C: on_request callback(req, request::Handle)
-    Note over C: UI stores the handle
+    L->>C: callback(&req, request::Resume)
+    Note over C: UI stores the resume handle
     C-->>H: game is now Pending
     H-->>UI: Poll::Pending
     Note over UI: host.borrow(..) to render, read keys...
-    UI->>C: handle.resume(PartyInput::Move(..))
+    UI->>C: resume.with(PartyInput::Move(..))
     UI->>H: step()
     H->>G: poll
     C-->>L: PartyInput::Move(..)
@@ -67,7 +69,7 @@ sequenceDiagram
 ## Hard constraints
 
 - **Single-threaded and cooperative.** No threads, no executor crate, no `Send`/`Sync` anywhere in the public API.
-  `Host`, `CtxMut`, and the handles are deliberately `!Send` and `!Sync` (they are built on `Rc`).
+  `Host`, `CtxMut`, and all handles are deliberately `!Send` and `!Sync` (they are built on `Rc`).
 - **No dependencies.** `genawaiter` is removed and nothing replaces it.
 - **The caller drives the game by hand.** `posturn` never polls on its own.
 - **Borrowing mistakes are compile errors** where possible: holding a module borrow while the game suspends, or
