@@ -5,6 +5,9 @@
 use std::any::{type_name, Any};
 use std::cell::{Ref, RefMut};
 
+mod ctx;
+pub use ctx::{Ctx, CtxMut};
+
 mod registry;
 pub use registry::Registry;
 
@@ -86,15 +89,3 @@ pub trait Module: Any {
         type_name::<Self>()
     }
 }
-
-/// Allows temporary, immutable access to game [`Module`]s while the game is suspended.
-#[derive(Clone, Copy)]
-pub struct Ctx<'a>(&'a Registry);
-
-impl private::AsRegistry for Ctx<'_> {
-    fn as_registry(&self) -> &Registry {
-        self.0
-    }
-}
-
-impl Borrow for Ctx<'_> {}

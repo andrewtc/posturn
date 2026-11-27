@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
 use super::*;
+use std::rc::Rc;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 struct CopyModule(u8);
@@ -35,6 +36,15 @@ fn borrow_mut_returns_module_ref() {
     registry.insert(CopyModule(1));
     registry.borrow_mut::<CopyModule>().0 += 1;
     assert_eq!(registry.borrow::<CopyModule>().0, 2);
+}
+
+#[test]
+fn ctx_borrow_mut_returns_module_ref() {
+    let mut registry = Registry::new();
+    registry.insert(CopyModule(1));
+    let ctx_mut = CtxMut::new(Rc::new(registry));
+    ctx_mut.borrow_mut::<CopyModule>().0 += 1;
+    assert_eq!(ctx_mut.borrow::<CopyModule>().0, 2);
 }
 
 #[test]
