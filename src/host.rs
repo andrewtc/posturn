@@ -10,10 +10,10 @@ use std::pin::Pin;
 use std::rc::Rc;
 use std::task::{Context, Poll, Waker};
 pub use setup::*;
-use crate::module::{CtxMut, Registry};
+use crate::module::{self, private, CtxMut, Registry};
 
 /// Error returned by [`Host::try_advance`] .
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum AdvanceError {
     /// Returned when a [`Host`] is advanced after the game previously panicked.
     /// This is an indicator that the `Host` is poisoned and the game needs to be restarted.
@@ -115,3 +115,15 @@ where
     /// Returns `true` if the [`Host`] can no longer be advanced due to being poisoned.
     pub fn is_poisoned(&self) -> bool { self.poisoned }
 }
+
+impl<Outcome> private::AsRegistry for Host<Outcome>
+where
+    Outcome: 'static,
+{
+    fn as_registry(&self) -> &Registry { &self.registry }
+}
+
+impl<Outcome> module::Borrow for Host<Outcome>
+where
+    Outcome: 'static,
+{ }

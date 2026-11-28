@@ -14,7 +14,7 @@ pub use registry::Registry;
 #[cfg(test)]
 mod tests;
 
-mod private {
+pub(crate) mod private {
     pub trait AsRegistry {
         fn as_registry(&self) -> &super::Registry;
     }
