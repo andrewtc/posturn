@@ -80,11 +80,17 @@ where
         let game = self.game.as_mut()
             .ok_or(AdvanceError::GameOver)?;
 
+        // NOTE: The poisoned flag will stay set if polling the game function panics, guarding against future advances.
+        // This is necessary because it is possible to catch the panic with catch_unwind.
+        self.poisoned = true;
         let mut poll_ctx = Context::from_waker(Waker::noop());
         let poll = game.as_mut().poll(&mut poll_ctx);
 
         // TODO: Support awaiting `async` tasks that are not events, e.g. background tasks initiated by the game.
         assert!(!poll.is_pending(), "Game is awaiting a future not created by posturn. This is an error because it would cause the game to pause indefinitely. HINT: Remove the await");
+
+        // NOTE: This MUST happen after any potential panics.
+        self.poisoned = false;
 
         if poll.is_ready() {
             // The game Future has returned, so clear it.
@@ -105,4 +111,7 @@ where
         self.try_advance()
             .unwrap_or_else(|error| panic!("Failed to advance Host: {}", error))
     }
+
+    /// Returns `true` if the [`Host`] can no longer be advanced due to being poisoned.
+    pub fn is_poisoned(&self) -> bool { self.poisoned }
 }
