@@ -4,6 +4,9 @@
 
 mod setup;
 
+#[cfg(test)]
+mod tests;
+
 use std::fmt;
 use std::future::Future;
 use std::pin::Pin;
